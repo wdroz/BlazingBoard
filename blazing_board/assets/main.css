@@ -38,8 +38,8 @@ body {
     cursor: pointer;
 }
 
-#header {
-    max-width: 1200px;
+#main {
+    width: 400px;;
 }
 
 
