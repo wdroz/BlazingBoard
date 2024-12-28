@@ -20,9 +20,15 @@ fn App() -> Element {
 
 #[component]
 pub fn Hero() -> Element {
+    let sentence_to_write = "Please write this text";
     rsx! {
         div { id: "hero",
             img { src: HEADER_MAIN, id: "main" }
+            div { id: "words",
+                for word in sentence_to_write.split(" ") {
+                    div { "{word}" }
+                }
+            }
             label { id: "textToWrite", "Please write this text" }
             input { id: "textUser" }
         }

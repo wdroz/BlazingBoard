@@ -39,8 +39,17 @@ body {
 }
 
 #main {
-    width: 400px;;
+    width: 400px;
 }
+
+#words {
+    width: 400px;
+    display: flex;
+    flex-direction: row;
+    /* Add a gap between flex items */
+    gap: 10px;
+  }
+  
 
 
 
