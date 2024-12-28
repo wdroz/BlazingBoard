@@ -49,6 +49,10 @@ body {
     /* Add a gap between flex items */
     gap: 10px;
   }
+
+#current {
+    background-color: cadetblue;
+}
   
 
 
