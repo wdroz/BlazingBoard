@@ -22,6 +22,7 @@ fn App() -> Element {
 pub fn Hero() -> Element {
     let sentence_to_write = "Please write this text";
     let mut current_word_indice = use_signal(|| 0);
+    let mut current_text =use_signal(|| String::new()); 
     rsx! {
         div { id: "hero",
             img { src: HEADER_MAIN, id: "main" }
@@ -40,8 +41,12 @@ pub fn Hero() -> Element {
                 oninput: move |event| async move {
                     let data = event.value();
                     let words: Vec<&str> = data.split(" ").collect();
-                    current_word_indice.set(words.len() - 1);
+                    current_word_indice.set((words.len() - 1) + current_word_indice());
+                    if let Some(last) = words.last() {
+                        current_text.set(last.to_string());
+                    }
                 },
+                value: "{current_text}",
             }
         }
     }
