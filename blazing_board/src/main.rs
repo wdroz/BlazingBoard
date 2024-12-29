@@ -21,13 +21,13 @@ fn App() -> Element {
 #[component]
 pub fn Hero() -> Element {
     let sentence_to_write = "Please write this text";
-    let mut current_word_indice = 0;
+    let mut current_word_indice = use_signal(|| 0);
     rsx! {
         div { id: "hero",
             img { src: HEADER_MAIN, id: "main" }
             div { id: "words",
                 for (i , word) in sentence_to_write.split(" ").enumerate() {
-                    if (i == current_word_indice) {
+                    if i == current_word_indice() {
                         div { id: "current", "{word}" }
                     } else {
                         div { "{word}" }
@@ -35,7 +35,14 @@ pub fn Hero() -> Element {
                 }
             }
             label { id: "textToWrite", "Please write this text" }
-            input { id: "textUser" }
+            input {
+                id: "textUser",
+                oninput: move |event| async move {
+                    let data = event.value();
+                    let words: Vec<&str> = data.split(" ").collect();
+                    current_word_indice.set(words.len() - 1);
+                },
+            }
         }
     }
 }
