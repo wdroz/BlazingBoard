@@ -53,6 +53,10 @@ body {
 #current {
     background-color: cadetblue;
 }
+
+.previous {
+    background-color: darkgray;
+}
   
 
 

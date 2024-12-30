@@ -28,7 +28,9 @@ pub fn Hero() -> Element {
             img { src: HEADER_MAIN, id: "main" }
             div { id: "words",
                 for (i , word) in sentence_to_write.split(" ").enumerate() {
-                    if i == current_word_indice() {
+                    if i < current_word_indice() {
+                        div { class: "previous", "{word}" }
+                    } else if i == current_word_indice() {
                         div { id: "current", "{word}" }
                     } else {
                         div { "{word}" }
