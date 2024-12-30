@@ -57,6 +57,16 @@ body {
 .previous {
     background-color: darkgray;
 }
+
+.previous_wrong {
+    background-color:red
+}
+
+.previous_correct {
+    background-color:green
+}
+
+
   
 
 
