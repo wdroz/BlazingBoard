@@ -56,7 +56,7 @@ pub fn Hero() -> Element {
                     let words: Vec<&str> = data.split(" ").collect();
                     current_word_indice.set((words.len() - 1) + current_word_indice());
                     if let Some(last) = words.last() {
-                        if current_text().len() > last.len() {
+                        if data.ends_with(" ") {
                             let mut newvec = user_words().to_vec();
                             for w in words.clone() {
                                 if w != " " && w != "" {
