@@ -20,16 +20,23 @@ fn App() -> Element {
 
 #[component]
 pub fn Hero() -> Element {
-    let sentence_to_write = "Please write this text";
     let mut current_word_indice = use_signal(|| 0);
     let mut current_text =use_signal(|| String::new());
     let mut user_words = use_signal(|| Vec::<String>::new());
-
+    let response_sentence_to_write = use_resource(|| async move {
+        get_text().await.unwrap_or("Please write this text".to_string())
+    });
+    
+    
     rsx! {
         div { id: "hero",
             img { src: HEADER_MAIN, id: "main" }
             div { id: "words",
-                for (i , word) in sentence_to_write.split(" ").enumerate() {
+                for (i , word) in response_sentence_to_write()
+                    .unwrap_or("Please write this text".to_string())
+                    .split(" ")
+                    .enumerate()
+                {
                     if i < current_word_indice() {
                         if user_words().len() - 1 >= i {
                             if user_words()[i] == word {
@@ -44,9 +51,6 @@ pub fn Hero() -> Element {
                         div { "{word}" }
                     }
                 }
-            }
-            for w in user_words() {
-                p { "debug {w}" }
             }
             label { id: "textToWrite", "Please write this text" }
             input {
@@ -104,4 +108,9 @@ fn Echo() -> Element {
 #[server(EchoServer)]
 async fn echo_server(input: String) -> Result<String, ServerFnError> {
     Ok(input)
+}
+
+#[server(TextServer)]
+async fn get_text() -> Result<String, ServerFnError> {
+    Ok("Please write this text".to_string())
 }
