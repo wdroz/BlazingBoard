@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use dioxus_elements::input::placeholder;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
