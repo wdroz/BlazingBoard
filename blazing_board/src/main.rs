@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use dioxus_elements::input::placeholder;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -51,7 +52,6 @@ pub fn TypingWords() -> Element {
                     }
                 }
             }
-            label { id: "textToWrite", "Please write this text" }
             input {
                 id: "textUser",
                 oninput: move |event| async move {
