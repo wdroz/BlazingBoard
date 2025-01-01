@@ -13,12 +13,12 @@ fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        Hero {}
+        TypingWords {}
     }
 }
 
 #[component]
-pub fn Hero() -> Element {
+pub fn TypingWords() -> Element {
     let mut current_word_indice = use_signal(|| 0);
     let mut current_text =use_signal(|| String::new());
     let mut user_words = use_signal(|| Vec::<String>::new());
@@ -28,7 +28,7 @@ pub fn Hero() -> Element {
     
     
     rsx! {
-        div { id: "hero",
+        div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
             div { id: "words",
                 for (i , word) in response_sentence_to_write()
