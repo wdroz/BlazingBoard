@@ -20,13 +20,14 @@ fn App() -> Element {
 #[component]
 pub fn TypingWords() -> Element {
     let mut current_word_indice = use_signal(|| 0);
-    let mut current_text =use_signal(|| String::new());
+    let mut current_text = use_signal(|| String::new());
     let mut user_words = use_signal(|| Vec::<String>::new());
     let response_sentence_to_write = use_resource(|| async move {
-        get_text().await.unwrap_or("Please write this text".to_string())
+        get_text()
+            .await
+            .unwrap_or("Please write this text".to_string())
     });
-    
-    
+
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
@@ -53,21 +54,23 @@ pub fn TypingWords() -> Element {
             }
             input {
                 id: "textUser",
-                oninput: move |event| async move {
-                    let data = event.value();
-                    let words: Vec<&str> = data.split(" ").collect();
-                    current_word_indice.set((words.len() - 1) + current_word_indice());
-                    if let Some(last) = words.last() {
-                        if data.ends_with(" ") {
-                            let mut newvec = user_words().to_vec();
-                            for w in words.clone() {
-                                if w != " " && w != "" {
-                                    newvec.push(w.to_string());
+                oninput: move |event| {
+                    async move {
+                        let data = event.value();
+                        let words: Vec<&str> = data.split(" ").collect();
+                        current_word_indice.set((words.len() - 1) + current_word_indice());
+                        if let Some(last) = words.last() {
+                            if data.ends_with(" ") {
+                                let mut newvec = user_words().to_vec();
+                                for w in words.clone() {
+                                    if w != " " && w != "" {
+                                        newvec.push(w.to_string());
+                                    }
                                 }
+                                user_words.set(newvec);
                             }
-                            user_words.set(newvec);
+                            current_text.set(last.to_string());
                         }
-                        current_text.set(last.to_string());
                     }
                 },
                 value: "{current_text}",
