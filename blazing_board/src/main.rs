@@ -33,6 +33,9 @@ pub fn TypingWords() -> Element {
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
     let nb_words_to_write = sentence_to_write_words.len();
+    let mut nb_correct = 0;
+    let mut nb_wrong = 0;
+    let mut accuracy = 0.0;
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
@@ -41,8 +44,14 @@ pub fn TypingWords() -> Element {
                     if i < current_word_indice() {
                         if user_words().len() - 1 >= i {
                             if user_words()[i] == word {
+                                {
+                                    nb_correct = nb_correct + 1;
+                                }
                                 div { class: "previous_correct", "{word}" }
                             } else {
+                                {
+                                    nb_wrong = nb_wrong + 1;
+                                }
                                 div { class: "previous_wrong", "{word}" }
                             }
                         }
@@ -78,7 +87,10 @@ pub fn TypingWords() -> Element {
                     value: "{current_text}",
                 }
             } else {
-                div { "Well done" }
+                {
+                    accuracy = f64::from(nb_correct) / f64::from(nb_correct + nb_wrong);
+                }
+                div { "Accuracy:  {nb_correct} / {nb_correct + nb_wrong} = {accuracy}" }
             }
         }
     }
