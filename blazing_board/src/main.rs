@@ -27,16 +27,17 @@ pub fn TypingWords() -> Element {
             .await
             .unwrap_or("Please write this text".to_string())
     });
-
+    let sentence_to_write_words = response_sentence_to_write()
+        .unwrap_or("Please write this text".to_string())
+        .split_whitespace()
+        .map(|w| w.to_string())
+        .collect::<Vec<String>>();
+    let nb_words_to_write = sentence_to_write_words.len();
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
             div { id: "words",
-                for (i , word) in response_sentence_to_write()
-                    .unwrap_or("Please write this text".to_string())
-                    .split(" ")
-                    .enumerate()
-                {
+                for (i , word) in sentence_to_write_words.into_iter().enumerate() {
                     if i < current_word_indice() {
                         if user_words().len() - 1 >= i {
                             if user_words()[i] == word {
@@ -52,28 +53,32 @@ pub fn TypingWords() -> Element {
                     }
                 }
             }
-            input {
-                id: "textUser",
-                oninput: move |event| {
-                    async move {
-                        let data = event.value();
-                        let words: Vec<&str> = data.split(" ").collect();
-                        current_word_indice.set((words.len() - 1) + current_word_indice());
-                        if let Some(last) = words.last() {
-                            if data.ends_with(" ") {
-                                let mut newvec = user_words().to_vec();
-                                for w in words.clone() {
-                                    if w != " " && w != "" {
-                                        newvec.push(w.to_string());
+            if user_words().len() < nb_words_to_write {
+                input {
+                    id: "textUser",
+                    oninput: move |event| {
+                        async move {
+                            let data = event.value();
+                            let words: Vec<&str> = data.split(" ").collect();
+                            current_word_indice.set((words.len() - 1) + current_word_indice());
+                            if let Some(last) = words.last() {
+                                if data.ends_with(" ") {
+                                    let mut newvec = user_words().to_vec();
+                                    for w in words.clone() {
+                                        if w != " " && w != "" {
+                                            newvec.push(w.to_string());
+                                        }
                                     }
+                                    user_words.set(newvec);
                                 }
-                                user_words.set(newvec);
+                                current_text.set(last.to_string());
                             }
-                            current_text.set(last.to_string());
                         }
-                    }
-                },
-                value: "{current_text}",
+                    },
+                    value: "{current_text}",
+                }
+            } else {
+                div { "Well done" }
             }
         }
     }
