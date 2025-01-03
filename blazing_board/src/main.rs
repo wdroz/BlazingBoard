@@ -1,11 +1,18 @@
 use dioxus::prelude::*;
-
+use wasm_bindgen::prelude::*;
+use jiff::Timestamp;
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const HEADER_MAIN: Asset = asset!("assets/logo_blazing_board.png");
 
 fn main() {
     dioxus::launch(App);
+}
+
+#[wasm_bindgen]
+pub fn get_timestamp_seconds_now() -> i64{
+    let now: Timestamp = Timestamp::now();
+    now.as_second()
 }
 
 #[component]
@@ -22,6 +29,7 @@ pub fn TypingWords() -> Element {
     let mut current_word_indice = use_signal(|| 0);
     let mut current_text = use_signal(|| String::new());
     let mut user_words = use_signal(|| Vec::<String>::new());
+    let mut start_typing_at = use_signal(|| None);
     let response_sentence_to_write = use_resource(|| async move {
         get_text()
             .await
@@ -36,6 +44,7 @@ pub fn TypingWords() -> Element {
     let mut nb_correct = 0;
     let mut nb_wrong = 0;
     let mut accuracy = 0.0;
+    let mut nb_seconds = 0;
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
@@ -67,6 +76,9 @@ pub fn TypingWords() -> Element {
                     id: "textUser",
                     oninput: move |event| {
                         async move {
+                            if start_typing_at().is_none() {
+                                start_typing_at.set(Some(get_timestamp_seconds_now()));
+                            }
                             let data = event.value();
                             let words: Vec<&str> = data.split(" ").collect();
                             current_word_indice.set((words.len() - 1) + current_word_indice());
@@ -89,8 +101,12 @@ pub fn TypingWords() -> Element {
             } else {
                 {
                     accuracy = f64::from(nb_correct) / f64::from(nb_correct + nb_wrong);
+                    if let Some(start_typing_at_some) = start_typing_at() {
+                        nb_seconds = get_timestamp_seconds_now() - start_typing_at_some;
+                    }
                 }
                 div { "Accuracy:  {nb_correct} / {nb_correct + nb_wrong} = {accuracy}" }
+                div { "time(s):  {nb_seconds}" }
             }
         }
     }
