@@ -1,0 +1,17 @@
+name: Build and Run Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    container:
+      image: docker:27
+    
+    steps:
+    - name: Build Docker image
+      run: |
+        docker build -t my-docker-image .
