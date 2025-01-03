@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
-use wasm_bindgen::prelude::*;
 use jiff::Timestamp;
+use wasm_bindgen::prelude::*;
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const HEADER_MAIN: Asset = asset!("assets/logo_blazing_board.png");
@@ -10,7 +10,7 @@ fn main() {
 }
 
 #[wasm_bindgen]
-pub fn get_timestamp_seconds_now() -> i64{
+pub fn get_timestamp_seconds_now() -> i64 {
     let now: Timestamp = Timestamp::now();
     now.as_second()
 }
@@ -45,6 +45,7 @@ pub fn TypingWords() -> Element {
     let mut nb_wrong = 0;
     let mut accuracy = 0.0;
     let mut nb_seconds = 0;
+    let mut wpm = 0.0;
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
@@ -103,10 +104,13 @@ pub fn TypingWords() -> Element {
                     accuracy = f64::from(nb_correct) / f64::from(nb_correct + nb_wrong);
                     if let Some(start_typing_at_some) = start_typing_at() {
                         nb_seconds = get_timestamp_seconds_now() - start_typing_at_some;
+                        let nb_minutes = nb_seconds as f64 / 60.0;
+                        wpm = f64::from(nb_correct) / nb_minutes;
                     }
                 }
                 div { "Accuracy:  {nb_correct} / {nb_correct + nb_wrong} = {accuracy}" }
                 div { "time(s):  {nb_seconds}" }
+                div { "wpm:  {wpm}" }
             }
         }
     }
