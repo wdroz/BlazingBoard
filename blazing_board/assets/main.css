@@ -20,7 +20,7 @@ body {
 
 
 #links {
-    width: 400px;
+    width: 850px;
     text-align: left;
     font-size: x-large;
     color: white;
@@ -44,11 +44,11 @@ body {
 }
 
 #main {
-    width: 400px;
+    width: 600px;
 }
 
 #words {
-    width: 400px; /* Keep this as the desired width */
+    width: 850px; /* Keep this as the desired width */
     max-height: 600px; /* Set a maximum height */
     display: flex;
     flex-wrap: wrap; /* Allow items to wrap within the container */
