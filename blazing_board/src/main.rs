@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use async_std::task::sleep;
+use dioxus::prelude::*;
 use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -57,7 +57,7 @@ pub fn TypingWords() -> Element {
             }
         }
     });
-    
+
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
@@ -133,5 +133,10 @@ pub fn TypingWords() -> Element {
 
 #[server(TextServer)]
 async fn get_text() -> Result<String, ServerFnError> {
-    Ok("Please write this text".to_string())
+    let my_str = "once upon a time programmers faced a big problem they wanted their code to be fast and safe but it was hard to have both languages like c plus plus were fast but could crash easily if you made a small mistake other languages like python were easier to use but too slow for certain tasks
+then came rust a programming language created by graydon hoare in two thousand six rust was like a superhero it promised speed and safety at the same time the key was its ownership system this system made sure that every piece of data in a program was well organized it was like having a librarian for your code making sure everything was in its place and nothing got lost or mixed up
+rust became popular because it solved real problems companies like mozilla used it to make faster and safer software programmers loved rust because it helped them avoid bugs without needing to spend hours checking their code rust also had a friendly community people helped each other learn and shared tools to make coding easier
+over the years rust grew stronger it became a favorite for building web servers operating systems and even games programmers felt proud when they used rust because it made their code clean fast and reliable
+and so rust became a legend in the world of programming showing that you dont have to choose between speed and safety you can have both the end";
+    Ok(my_str.to_string())
 }
