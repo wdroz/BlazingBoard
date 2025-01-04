@@ -48,12 +48,17 @@ body {
 }
 
 #words {
-    width: 400px;
+    width: 400px; /* Keep this as the desired width */
+    max-height: 600px; /* Set a maximum height */
     display: flex;
-    flex-direction: row;
-    /* Add a gap between flex items */
-    gap: 10px;
-  }
+    flex-wrap: wrap; /* Allow items to wrap within the container */
+    gap: 10px; /* Keep the spacing between the words */
+    overflow-y: auto; /* Enable vertical scrolling if the content overflows */
+    padding: 10px; /* Add padding for better spacing */
+    background-color: #1f1f1f; /* Optional: background color for distinction */
+    border-radius: 10px; /* Optional: rounded corners for aesthetics */
+}
+
 
 #current {
     background-color: cadetblue;
