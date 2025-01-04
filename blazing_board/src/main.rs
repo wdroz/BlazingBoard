@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use async_std::task::sleep;
 use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -46,9 +47,21 @@ pub fn TypingWords() -> Element {
     let mut accuracy = 0.0;
     let mut nb_seconds = 0;
     let mut wpm = 0.0;
+    let mut timer_value = use_signal(|| 60);
+    let mut time_should_decrement = use_signal(|| false);
+    let _ = use_coroutine(move |_: UnboundedReceiver<i32>| async move {
+        loop {
+            sleep(std::time::Duration::from_secs(1)).await;
+            if time_should_decrement() {
+                timer_value.set(timer_value() - 1);
+            }
+        }
+    });
+    
     rsx! {
         div { id: "TypingWords",
             img { src: HEADER_MAIN, id: "main" }
+            div { id: "timer", "{timer_value}" }
             div { id: "words",
                 for (i , word) in sentence_to_write_words.into_iter().enumerate() {
                     if i < current_word_indice() {
@@ -72,11 +85,12 @@ pub fn TypingWords() -> Element {
                     }
                 }
             }
-            if user_words().len() < nb_words_to_write {
+            if user_words().len() < nb_words_to_write && timer_value() > 0 {
                 input {
                     id: "textUser",
                     oninput: move |event| {
                         async move {
+                            time_should_decrement.set(true);
                             if start_typing_at().is_none() {
                                 start_typing_at.set(Some(get_timestamp_seconds_now()));
                             }
@@ -101,6 +115,7 @@ pub fn TypingWords() -> Element {
                 }
             } else {
                 {
+                    time_should_decrement.set(false);
                     accuracy = f64::from(nb_correct) / f64::from(nb_correct + nb_wrong);
                     if let Some(start_typing_at_some) = start_typing_at() {
                         nb_seconds = get_timestamp_seconds_now() - start_typing_at_some;
