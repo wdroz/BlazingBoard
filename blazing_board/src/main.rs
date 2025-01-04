@@ -138,5 +138,5 @@ then came rust a programming language created by graydon hoare in two thousand s
 rust became popular because it solved real problems companies like mozilla used it to make faster and safer software programmers loved rust because it helped them avoid bugs without needing to spend hours checking their code rust also had a friendly community people helped each other learn and shared tools to make coding easier
 over the years rust grew stronger it became a favorite for building web servers operating systems and even games programmers felt proud when they used rust because it made their code clean fast and reliable
 and so rust became a legend in the world of programming showing that you dont have to choose between speed and safety you can have both the end";
-    Ok(my_str.to_string())
+    Ok(my_str.replace('\n', " ").to_string())
 }
