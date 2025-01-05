@@ -47,6 +47,43 @@ body {
     width: 600px;
 }
 
+#gh {
+    position: absolute; /* Allows positioning */
+    top: 10px; /* Adjust as needed */
+    right: 10px; /* Adjust as needed */
+    display: flex; /* Aligns the image and text inline */
+    align-items: center; /* Aligns image and text vertically */
+    text-decoration: none; /* Removes underline from the link */
+    color: #000; /* Set the default link color */
+}
+
+#gh img {
+    width: 20px; /* Adjust the size of the image */
+    height: auto; /* Keeps the aspect ratio */
+    margin-right: 5px; /* Space between the image and the text */
+}
+
+#gh span {
+    font-size: 14px; /* Adjust the text size */
+    color: inherit; /* Inherit color from parent (#gh) */
+}
+
+/* Style for visited links */
+#gh:visited {
+    color: #ffffff; /* Ensure the visited link color matches the normal link color */
+}
+
+/* Optionally add hover and active styles for consistency */
+#gh:hover {
+    color: #ffffff; /* Change the color on hover (optional) */
+}
+
+#gh:active {
+    color: #ffffff; /* Change the color when the link is active (optional) */
+}
+
+
+
 #words {
     width: 850px; /* Keep this as the desired width */
     max-height: 600px; /* Set a maximum height */

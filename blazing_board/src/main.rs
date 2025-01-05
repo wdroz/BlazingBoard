@@ -4,6 +4,7 @@ use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
+const GITHUB_LOGO: Asset = asset!("/assets/github_logo.png");
 const HEADER_MAIN: Asset = asset!("assets/logo_blazing_board.png");
 
 fn main() {
@@ -21,6 +22,13 @@ fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
+        a {
+            id: "gh",
+            href: "https://github.com/wdroz/BlazingBoard",
+            target: "_blank",
+            img { src: GITHUB_LOGO }
+            span { "repo" }
+        }
         TypingWords {}
     }
 }
