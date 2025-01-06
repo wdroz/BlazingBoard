@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - master
-env:
-  PROJECT_ID: { { PROJECT_ID } }
-  GAR_LOCATION: { { GAR_LOCATION } }
-  REPOSITORY: { { GAR_REPOSITORY } }
-  SERVICE: { { SERVICE } }
-  REGION: { { REGION } }
 
 jobs:
   deploy:
