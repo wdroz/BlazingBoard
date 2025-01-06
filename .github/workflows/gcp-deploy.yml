@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - master
+env:
+  PROJECT_ID: { { PROJECT_ID } }
+  GAR_LOCATION: { { GAR_LOCATION } }
+  REPOSITORY: { { GAR_REPOSITORY } }
+  SERVICE: { { SERVICE } }
+  REGION: { { REGION } }
 
 jobs:
   deploy:
@@ -22,6 +28,7 @@ jobs:
         uses: "google-github-actions/auth@v2"
         with:
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          token_format: 'access_token'
 
       - name: Login to GAR
         uses: docker/login-action@v3.3.0
