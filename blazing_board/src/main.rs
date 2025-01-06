@@ -42,10 +42,10 @@ pub fn TypingWords() -> Element {
     let response_sentence_to_write = use_resource(|| async move {
         get_text()
             .await
-            .unwrap_or("Please write this text".to_string())
+            .unwrap_or("This site requires JavaScript to function properly".to_string())
     });
     let sentence_to_write_words = response_sentence_to_write()
-        .unwrap_or("Please write this text".to_string())
+        .unwrap_or("This site requires JavaScript to function properly".to_string())
         .split_whitespace()
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
