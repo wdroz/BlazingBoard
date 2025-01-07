@@ -27,22 +27,22 @@ jobs:
       - name: Login to GAR
         uses: docker/login-action@v3
         with:
-          registry: us-central1-docker.pkg.dev
+          registry: ${{ vars.GAR_LOCATION }}-docker.pkg.dev
           username: _json_key
           password: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Build and Push Container
         run: |-
-          docker build -t "us-central1-docker.pkg.dev/blazing-board-446910/blazing-repo-us/blazing-image:latest" ./
-          docker push "us-central1-docker.pkg.dev/blazing-board-446910/blazing-repo-us/blazing-image:latest"
+          docker build -t "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest" ./
+          docker push "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest"
 
       - name: Deploy to Cloud Run
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: blazing-image
-          region: us-central1
-          image: us-central1-docker.pkg.dev/blazing-board-446910/blazing-repo-us/blazing-image:latest
+          service: ${{ vars.SERVICE }}
+          region: ${{ vars.REGION }}
+          image: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest
 
       - name: Show Output
         run: echo ${{ steps.deploy.outputs.url }}
