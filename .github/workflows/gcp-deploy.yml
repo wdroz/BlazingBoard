@@ -33,8 +33,8 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -t "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest" ./
-          docker push "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest"
+          docker build -t "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.SERVICE }}:latest" ./
+          docker push "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.SERVICE }}:latest"
 
       - name: Deploy to Cloud Run
         id: deploy
@@ -42,7 +42,7 @@ jobs:
         with:
           service: ${{ vars.SERVICE }}
           region: ${{ vars.REGION }}
-          image: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.REPOSITORY }}/${{ vars.SERVICE }}:latest
+          image: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.SERVICE }}:latest
 
       - name: Show Output
         run: echo ${{ steps.deploy.outputs.url }}
