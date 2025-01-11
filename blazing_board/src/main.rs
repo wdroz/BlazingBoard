@@ -2,6 +2,9 @@ use async_std::task::sleep;
 use dioxus::prelude::*;
 use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
+
+const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
+
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const GITHUB_LOGO: Asset = asset!("/assets/github_logo.png");
@@ -42,10 +45,10 @@ pub fn TypingWords() -> Element {
     let response_sentence_to_write = use_resource(|| async move {
         get_text()
             .await
-            .unwrap_or("This site requires JavaScript to function properly".to_string())
+            .unwrap_or(NO_JS_MESSAGE.to_string())
     });
     let sentence_to_write_words = response_sentence_to_write()
-        .unwrap_or("This site requires JavaScript to function properly".to_string())
+        .unwrap_or(NO_JS_MESSAGE.to_string())
         .split_whitespace()
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
