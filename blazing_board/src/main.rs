@@ -168,10 +168,10 @@ pub fn TypingWords() -> Element {
                     }
                 }
                 div {
-                    "Accuracy:  {all_nb_correct() + nb_correct} / {all_nb_correct() + nb_correct + all_nb_wrong() + nb_wrong} = {accuracy}"
+                    "Accuracy:  {all_nb_correct() + nb_correct} / {all_nb_correct() + nb_correct + all_nb_wrong() + nb_wrong} = {100.0 * accuracy:.0}%"
                 }
                 div { "time(s):  {nb_seconds}" }
-                div { "wpm:  {wpm}" }
+                div { "wpm:  {wpm:.0}" }
             }
         }
     }
