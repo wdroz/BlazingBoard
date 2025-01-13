@@ -153,6 +153,7 @@ pub fn TypingWords() -> Element {
                         }
                     },
                     value: "{current_text}",
+                    autofocus: true,
                 }
             } else {
                 {
