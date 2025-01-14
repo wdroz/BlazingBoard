@@ -3,6 +3,28 @@ use dioxus::prelude::*;
 use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "server")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "server")]
+use std::env;
+#[cfg(feature = "server")]
+use firestore::{FirestoreDb, FirestoreQueryDirection, FirestoreResult, FirestoreDbOptions};
+#[cfg(feature = "server")]
+use chrono::{DateTime, Utc};
+#[cfg(feature = "server")]
+use futures::stream::StreamExt;
+#[cfg(feature = "server")]
+use std::sync::LazyLock;
+
+#[cfg(feature = "server")]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Story {
+    sources: Vec<String>,
+    story: String,
+    when: DateTime<Utc>,
+}
+
+
 const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
 const DEFAULT_TEXT: &str = include_str!("../assets/texts/01.txt");
 
@@ -90,8 +112,8 @@ pub fn TypingWords() -> Element {
     };
     let next_chunk = {
         let index = current_chunk_index();
-        if index+1 < nb_chunks_to_write {
-            sentence_to_write_chunks[index+1].clone()
+        if index + 1 < nb_chunks_to_write {
+            sentence_to_write_chunks[index + 1].clone()
         } else {
             vec![]
         }
@@ -189,6 +211,43 @@ pub fn TypingWords() -> Element {
 
 #[server(TextServer)]
 async fn get_text() -> Result<String, ServerFnError> {
-    let my_str = DEFAULT_TEXT;
-    Ok(my_str.replace('\n', " ").to_string())
+    static DB: LazyLock<Result<String, ServerFnError>> = LazyLock::new(async {
+        // Load environment variables
+    dotenvy::dotenv().ok();
+
+    // Initialize Firestore client
+    let project_id = env::var("PROJECT_ID")
+        .map_err::<ServerFnError, _>(|_| ServerFnError::ServerError("PROJECT_ID not set".into()))?;
+    let database_id = env::var("DATABASE_ID")
+        .map_err::<ServerFnError, _>(|_| ServerFnError::ServerError("DATABASE_ID not set".into()))?;
+    let db = FirestoreDb::with_options_service_account_key_file(
+        FirestoreDbOptions::new(project_id.to_string()).with_database_id(database_id.to_string()),
+        "key.json".into()
+      ).await.map_err::<ServerFnError, _>(|e| ServerFnError::ServerError(e.to_string()))?;
+      Ok(db)
+    }); 
+
+    // Query the 'stories' collection for the latest story
+    if let Ok(db) = *DB {
+        let mut story_stream = db
+        .fluent()
+        .select()
+        .from("texts")
+        .order_by([("when", FirestoreQueryDirection::Descending)])
+        .limit(1)
+        .obj::<Story>()
+        .stream_query()
+        .await
+        .map_err::<ServerFnError, _>(|e| ServerFnError::ServerError(e.to_string()))?;
+
+    // Retrieve the latest story
+    match story_stream.next().await {
+        Some(latest_story) => Ok(latest_story.story.replace('\n', " ")),
+        None => Err(ServerFnError::ServerError("No stories found".into())),
+    }
+    }
+    else {
+        Ok("random text".to_string())
+    }
+    
 }
