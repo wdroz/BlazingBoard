@@ -47,11 +47,8 @@ pub fn TypingWords() -> Element {
     let mut all_nb_correct = use_signal(|| 0);
     let mut all_nb_wrong = use_signal(|| 0);
 
-    let response_sentence_to_write = use_resource(|| async move {
-        get_text()
-            .await
-            .unwrap_or(NO_JS_MESSAGE.to_string())
-    });
+    let response_sentence_to_write =
+        use_resource(|| async move { get_text().await.unwrap_or(NO_JS_MESSAGE.to_string()) });
     let sentence_to_write_words = response_sentence_to_write()
         .unwrap_or(NO_JS_MESSAGE.to_string())
         .split_whitespace()
@@ -177,8 +174,6 @@ pub fn TypingWords() -> Element {
         }
     }
 }
-
-
 
 #[server(TextServer)]
 async fn get_text() -> Result<String, ServerFnError> {
