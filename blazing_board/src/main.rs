@@ -88,6 +88,14 @@ pub fn TypingWords() -> Element {
             vec![]
         }
     };
+    let next_chunk = {
+        let index = current_chunk_index();
+        if index+1 < nb_chunks_to_write {
+            sentence_to_write_chunks[index+1].clone()
+        } else {
+            vec![]
+        }
+    };
 
     rsx! {
         div { id: "TypingWords",
@@ -114,6 +122,10 @@ pub fn TypingWords() -> Element {
                     } else {
                         div { "{word}" }
                     }
+                }
+                div { class: "break" }
+                for word in next_chunk.iter() {
+                    div { "{word}" }
                 }
             }
             if current_chunk_index() < nb_chunks_to_write && timer_value() > 0 {

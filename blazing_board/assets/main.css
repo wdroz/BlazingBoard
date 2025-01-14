@@ -57,11 +57,14 @@ body {
     color: #ffffff; /* Change the color when the link is active (optional) */
 }
 
-
+.break {
+    flex-basis: 100%;
+    height: 0;
+  }
 
 #words {
     width: 450px; /* Keep this as the desired width */
-    height: 3em;
+    height: auto;
     display: flex;
     flex-wrap: wrap; /* Allow items to wrap within the container */
     gap: 10px; /* Keep the spacing between the words */
