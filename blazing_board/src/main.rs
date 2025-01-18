@@ -240,15 +240,26 @@ async fn get_client_db() -> &'static FirestoreDb {
         .get_or_init(|| async {
             dotenvy::dotenv().ok();
 
-            // Initialize Firestore client
             let project_id = env::var("PROJECT_ID").expect("PROJECT_ID not set");
-            let database_id = env::var("DATABASE_ID").expect("DATABASE_ID not set");
+                let database_id = env::var("DATABASE_ID").expect("DATABASE_ID not set");
+
+            // Check for the "IAMTHEDEV" environment variable
+            if env::var("IAMTHEDEV").is_err() {
+                let db = FirestoreDb::with_options(
+                    FirestoreDbOptions::new(project_id).with_database_id(database_id),
+                )
+                .await
+                .expect("Failed to initialize FirestoreDb using PROJECT_ID and DATABASE_ID");
+                return db;
+            }
+
+            // Initialize Firestore client using service account key file
             let db = FirestoreDb::with_options_service_account_key_file(
                 FirestoreDbOptions::new(project_id).with_database_id(database_id),
                 "key.json".into(),
             )
             .await
-            .expect("Failed to initialize FirestoreDb");
+            .expect("Failed to initialize FirestoreDb using service account key file");
 
             db
         })
