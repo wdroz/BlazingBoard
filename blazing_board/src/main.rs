@@ -13,9 +13,10 @@ use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use std::env;
+use std::sync::Arc;
 #[cfg(feature = "server")]
-use tokio::sync::OnceCell;
-
+use tokio::sync::{Mutex, OnceCell};
+#[cfg(feature = "server")]
 #[cfg(feature = "server")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Story {
@@ -26,6 +27,10 @@ struct Story {
 
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
+#[cfg(feature = "server")]
+static LAST_TIME_REQ: OnceCell<Arc<Mutex<i64>>> = OnceCell::const_new();
+#[cfg(feature = "server")]
+static LAST_TIME_REQ_RESULT: OnceCell<Arc<Mutex<String>>> = OnceCell::const_new();
 
 const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
 const DEFAULT_TEXT: &str = include_str!("../assets/texts/01.txt");
@@ -43,6 +48,35 @@ fn main() {
 pub fn get_timestamp_seconds_now_wasm() -> i64 {
     let now: Timestamp = Timestamp::now();
     now.as_second()
+}
+
+pub fn get_timestamp_seconds_now() -> i64 {
+    let now: Timestamp = Timestamp::now();
+    now.as_second()
+}
+
+#[cfg(feature = "server")]
+async fn initialize_last_time_req() -> Arc<Mutex<i64>> {
+    Arc::new(Mutex::new(0))
+}
+#[cfg(feature = "server")]
+async fn get_last_time_req() -> Arc<Mutex<i64>> {
+    LAST_TIME_REQ
+        .get_or_init(initialize_last_time_req)
+        .await
+        .clone()
+}
+
+#[cfg(feature = "server")]
+async fn initialize_last_time_req_result() -> Arc<Mutex<String>> {
+    Arc::new(Mutex::new(DEFAULT_TEXT.to_string()))
+}
+#[cfg(feature = "server")]
+async fn get_last_time_req_result() -> Arc<Mutex<String>> {
+    LAST_TIME_REQ_RESULT
+        .get_or_init(initialize_last_time_req_result)
+        .await
+        .clone()
 }
 
 #[component]
@@ -213,24 +247,48 @@ pub fn TypingWords() -> Element {
 
 #[server(TextServer)]
 async fn get_text() -> Result<String, ServerFnError> {
-    let db = get_client_db().await;
+    let last_time_req = get_last_time_req().await;
+    let mut last_time = last_time_req.lock().await;
+    let mut should_continue = false;
+    if *last_time == 0i64 {
+        *last_time = get_timestamp_seconds_now();
+        should_continue = true;
+    } else {
+        let current = get_timestamp_seconds_now();
+        if (current - *last_time) > 60 * 60 {
+            *last_time = get_timestamp_seconds_now();
+            should_continue = true
+        }
+    }
+    let last_time_req_result = get_last_time_req_result().await;
+    let mut last_time_result = last_time_req_result.lock().await;
+    if should_continue {
+        let db = get_client_db().await;
 
-    // Query the 'stories' collection for the latest story
-    let mut story_stream = db
-        .fluent()
-        .select()
-        .from("texts")
-        .order_by([("when", FirestoreQueryDirection::Descending)])
-        .limit(1)
-        .obj::<Story>()
-        .stream_query()
-        .await
-        .map_err::<ServerFnError, _>(|e| ServerFnError::ServerError(e.to_string()))?;
+        // Query the 'stories' collection for the latest story
+        let mut story_stream = db
+            .fluent()
+            .select()
+            .from("texts")
+            .order_by([("when", FirestoreQueryDirection::Descending)])
+            .limit(1)
+            .obj::<Story>()
+            .stream_query()
+            .await
+            .map_err::<ServerFnError, _>(|e| ServerFnError::ServerError(e.to_string()))?;
 
-    // Retrieve the latest story
-    match story_stream.next().await {
-        Some(latest_story) => Ok(latest_story.story.replace('\n', " ")),
-        None => Err(ServerFnError::ServerError("No stories found".into())),
+        // Retrieve the latest story
+        match story_stream.next().await {
+            Some(latest_story) => {
+                let filtered_story = latest_story.story.replace('\n', " ");
+                *last_time_result = filtered_story.clone();
+                Ok(filtered_story)
+            },
+            None => Err(ServerFnError::ServerError("No stories found".into())),
+        }
+    } else {
+
+        Ok((*last_time_result.clone()).to_string())
     }
 }
 
@@ -241,7 +299,7 @@ async fn get_client_db() -> &'static FirestoreDb {
             dotenvy::dotenv().ok();
 
             let project_id = env::var("PROJECT_ID").expect("PROJECT_ID not set");
-                let database_id = env::var("DATABASE_ID").expect("DATABASE_ID not set");
+            let database_id = env::var("DATABASE_ID").expect("DATABASE_ID not set");
 
             // Check for the "IAMTHEDEV" environment variable
             if env::var("IAMTHEDEV").is_err() {
