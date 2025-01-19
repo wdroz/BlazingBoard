@@ -40,7 +40,7 @@ fn main() {
 }
 
 #[wasm_bindgen]
-pub fn get_timestamp_seconds_now() -> i64 {
+pub fn get_timestamp_seconds_now_wasm() -> i64 {
     let now: Timestamp = Timestamp::now();
     now.as_second()
 }
@@ -160,7 +160,7 @@ pub fn TypingWords() -> Element {
                         async move {
                             time_should_decrement.set(true);
                             if start_typing_at().is_none() {
-                                start_typing_at.set(Some(get_timestamp_seconds_now()));
+                                start_typing_at.set(Some(get_timestamp_seconds_now_wasm()));
                             }
                             let data = event.value();
                             if data.ends_with(" ") {
@@ -196,7 +196,7 @@ pub fn TypingWords() -> Element {
                     accuracy = f64::from(all_nb_correct() + nb_correct)
                         / f64::from(all_nb_correct() + nb_correct + all_nb_wrong() + nb_wrong);
                     if let Some(start_typing_at_some) = start_typing_at() {
-                        nb_seconds = get_timestamp_seconds_now() - start_typing_at_some;
+                        nb_seconds = get_timestamp_seconds_now_wasm() - start_typing_at_some;
                         let nb_minutes = nb_seconds as f64 / 60.0;
                         wpm = f64::from(all_nb_correct() + nb_correct) / nb_minutes;
                     }
