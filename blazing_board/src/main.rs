@@ -283,11 +283,10 @@ async fn get_text() -> Result<String, ServerFnError> {
                 let filtered_story = latest_story.story.replace('\n', " ");
                 *last_time_result = filtered_story.clone();
                 Ok(filtered_story)
-            },
+            }
             None => Err(ServerFnError::ServerError("No stories found".into())),
         }
     } else {
-
         Ok((*last_time_result.clone()).to_string())
     }
 }
