@@ -8,7 +8,7 @@ struct HNQueryResult {
     raw_text: String,
 }
 
-fn query() -> Result<HNQueryResult> {
+async fn query() -> Result<HNQueryResult> {
     let browser = Browser::new(
         LaunchOptions::default_builder()
             .sandbox(false)
@@ -46,9 +46,9 @@ fn query() -> Result<HNQueryResult> {
         Err(anyhow!("No comments link found."))
     }
 }
-
-fn main() -> Result<()> {
-    if let Ok(hn_qr) = query()  {
+#[tokio::main]
+async fn main() -> Result<()> {
+    if let Ok(hn_qr) = query().await  {
         println!("{}", hn_qr.raw_text);
         println!("{}", hn_qr.title);
         println!("{}", hn_qr.link);
