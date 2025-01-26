@@ -31,10 +31,16 @@ jobs:
           username: _json_key
           password: ${{ secrets.GCP_CREDENTIALS }}
 
-      - name: Build and Push Container
+      - name: Build and Push Container for Blazing Board
         run: |-
           docker build -t "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.SERVICE }}:latest" ./
           docker push "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.SERVICE }}:latest"
+  
+      - name: Build and Push Container for content updater (cron)
+        working-directory: ./content_updater
+        run: |-
+          docker build -t "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.CRON_SERVICE }}:latest" ./
+          docker push "${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/${{ vars.CRON_SERVICE }}:latest"
 
       - name: Deploy to Cloud Run
         id: deploy
