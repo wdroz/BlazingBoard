@@ -1,10 +1,12 @@
 use anyhow::{anyhow, Result};
 use std::{thread, time};
 use headless_chrome::{Browser, LaunchOptions};
-
-use genai::chat::printer::print_chat_stream;
+use serde::{Deserialize, Serialize};
+use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection, FirestoreResult};
 use genai::chat::{ChatMessage, ChatRequest};
 use genai::Client;
+use chrono::{DateTime, Utc};
+use std::env;
 
 const MODEL: &str = "gpt-4o";
 
@@ -14,9 +16,52 @@ struct HNQueryResult {
     raw_text: String,
 }
 
-struct TypingTextEntry {
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Story {
     sources: Vec<String>,
     story: String,
+    #[serde(with = "firestore::serialize_as_timestamp")]
+    when: DateTime<Utc>,
+}
+
+async fn get_db() -> Result<FirestoreDb>{
+    dotenvy::dotenv().ok();
+
+    let project_id = env::var("PROJECT_ID").expect("PROJECT_ID not set");
+    let database_id = env::var("DATABASE_ID").expect("DATABASE_ID not set");
+
+    // Check for the "IAMTHEDEV" environment variable
+    if env::var("IAMTHEDEV").is_err() {
+        let db: FirestoreDb = FirestoreDb::with_options(
+            FirestoreDbOptions::new(project_id).with_database_id(database_id),
+        )
+        .await
+        .expect("Failed to initialize FirestoreDb using PROJECT_ID and DATABASE_ID");
+        return Ok(db);
+    }
+
+    // Initialize Firestore client using service account key file
+    let db = FirestoreDb::with_options_service_account_key_file(
+        FirestoreDbOptions::new(project_id).with_database_id(database_id),
+        "key.json".into(),
+    )
+    .await
+    .expect("Failed to initialize FirestoreDb using service account key file");
+
+    Ok(db)
+}
+
+async fn save_story(text_entry: &Story) -> Result<()> {
+    if let Ok(db) = get_db().await {
+        let object_returned: Story = db.fluent()
+            .insert()
+            .into("texts")
+            .generate_document_id()
+            .object(text_entry)
+            .execute()
+            .await?;
+    }
+    Ok(())
 }
 
 async fn query() -> Result<HNQueryResult> {
@@ -58,7 +103,7 @@ async fn query() -> Result<HNQueryResult> {
     }
 }
 
-async fn generate_typing_text_entry(hn_query_result: &HNQueryResult) -> Result<TypingTextEntry> {
+async fn generate_typing_text_entry(hn_query_result: &HNQueryResult) -> Result<Story> {
     let client = Client::default();
     let chat_req_str = format!("For a typing training program, you need to create a positive and interesting text based the hacker news article {}. You will need to infer the content of the article from the comments, please answer close to 250 words in lowercase and without ponctuation.", hn_query_result.title);
 	let mut chat_req = ChatRequest::default().with_system(chat_req_str);
@@ -72,9 +117,10 @@ async fn generate_typing_text_entry(hn_query_result: &HNQueryResult) -> Result<T
     let chat_res = client.exec_chat(MODEL, chat_req.clone(), None).await?;
 
     if let Some(text_result) = chat_res.content_text_as_str() {
-        Ok(TypingTextEntry {
+        Ok(Story {
             sources: vec![hn_query_result.link.clone()],
-            story: text_result.to_string()
+            story: text_result.to_string(),
+            when: Utc::now(),
         })
     }
     else {
@@ -90,7 +136,10 @@ async fn main() -> Result<()> {
         println!("{}", hn_qr.link);
         if let Ok(story_entry) = generate_typing_text_entry(&hn_qr).await {
             println!("{}", story_entry.story);
-            Ok(())
+            match save_story(&story_entry).await {
+                Ok(()) => Ok(()),
+                _ => Err(anyhow!("Unable to save the story to the cloud")),
+            }
         }
         else {
             Err(anyhow!("Unable to generate the story"))
