@@ -1,0 +1,14 @@
+[package]
+name = "content_updater"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+dotenvy = "0.15.7"
+headless_chrome = "1.0.15"
+genai = "=0.1.18"
+tokio = { version = "1", features = ["full"] }
+firestore = "0.44.0"
+serde = "1.0.217"
+chrono = "0.4.39"
