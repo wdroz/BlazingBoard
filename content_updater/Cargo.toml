@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.95"
 headless_chrome = "1.0.15"
+genai = "=0.1.18"
 tokio = { version = "1", features = ["full"] }
