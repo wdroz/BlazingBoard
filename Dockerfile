@@ -1,13 +1,21 @@
-FROM rust:1 AS builder
+FROM rust:bookworm AS builder
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    ca-certificates \
+    tzdata \
+    openssl \
+    git
 
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN cargo binstall dioxus-cli --root /.cargo -y --force
+# Install dioxus-cli with specific features
+RUN cargo install dioxus-cli --root /.cargo
+
 WORKDIR /app
 COPY . .
 WORKDIR /app/blazing_board
 RUN /.cargo/bin/dx bundle --platform web
 
-FROM rust:1 AS runtime
+FROM rust:bookworm AS runtime
 COPY --from=builder /app/blazing_board/target/dx/blazing_board/release/web/ /usr/local/app
 
 # set our port and make sure to listen for all connections
