@@ -35,6 +35,7 @@ fn query() -> Result<()> {
         let comment_tree = tab.find_element("table.comment-tree")?;
         let all_comments_text = comment_tree.get_inner_text()?;
         println!("{}", all_comments_text);
+        println!("{}", tab.get_title()?);
     } else {
         println!("No comments link found.");
     }
