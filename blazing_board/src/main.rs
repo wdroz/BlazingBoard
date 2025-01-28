@@ -280,7 +280,13 @@ async fn get_text() -> Result<String, ServerFnError> {
         // Retrieve the latest story
         match story_stream.next().await {
             Some(latest_story) => {
-                let filtered_story = latest_story.story.replace('\n', " ");
+                let filtered_story = latest_story
+                    .story
+                    .replace('\n', " ")
+                    .replace(",", "")
+                    .replace(".", "")
+                    .replace(":", "")
+                    .replace(";", "");
                 *last_time_result = filtered_story.clone();
                 Ok(filtered_story)
             }
