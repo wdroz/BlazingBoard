@@ -20,6 +20,7 @@ struct HNQueryResult {
 struct Story {
     sources: Vec<String>,
     story: String,
+    title: String,
     #[serde(with = "firestore::serialize_as_timestamp")]
     when: DateTime<Utc>,
 }
@@ -121,6 +122,7 @@ async fn generate_typing_text_entry(hn_query_result: &HNQueryResult) -> Result<S
         Ok(Story {
             sources: vec![hn_query_result.link.clone()],
             story: text_result.to_string(),
+            title: hn_query_result.title.clone(),
             when: Utc::now(),
         })
     } else {

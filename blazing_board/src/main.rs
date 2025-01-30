@@ -22,6 +22,7 @@ use tokio::sync::{Mutex, OnceCell};
 struct Story {
     sources: Vec<String>,
     story: String,
+    title: Option<String>,
     when: DateTime<Utc>,
 }
 
@@ -31,9 +32,12 @@ static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
 static LAST_TIME_REQ: OnceCell<Arc<Mutex<i64>>> = OnceCell::const_new();
 #[cfg(feature = "server")]
 static LAST_TIME_REQ_RESULT: OnceCell<Arc<Mutex<String>>> = OnceCell::const_new();
+#[cfg(feature = "server")]
+static LAST_TITLE: OnceCell<Arc<Mutex<String>>> = OnceCell::const_new();
 
 const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
 const DEFAULT_TEXT: &str = include_str!("../assets/texts/01.txt");
+const DEFAULT_TITLE: &str = "";
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -79,6 +83,18 @@ async fn get_last_time_req_result() -> Arc<Mutex<String>> {
         .clone()
 }
 
+#[cfg(feature = "server")]
+async fn initialize_last_title() -> Arc<Mutex<String>> {
+    Arc::new(Mutex::new(DEFAULT_TITLE.to_string()))
+}
+#[cfg(feature = "server")]
+async fn get_last_title() -> Arc<Mutex<String>> {
+    LAST_TITLE
+        .get_or_init(initialize_last_title)
+        .await
+        .clone()
+}
+
 #[component]
 fn App() -> Element {
     rsx! {
@@ -107,11 +123,15 @@ pub fn TypingWords() -> Element {
 
     let response_sentence_to_write =
         use_resource(|| async move { get_text().await.unwrap_or(NO_JS_MESSAGE.to_string()) });
+    let last_title_req =
+        use_resource(|| async move { get_title().await.unwrap_or(DEFAULT_TITLE.to_string()) });
     let sentence_to_write_words = response_sentence_to_write()
         .unwrap_or(NO_JS_MESSAGE.to_string())
         .split_whitespace()
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
+
+    let last_title = last_title_req().unwrap_or(DEFAULT_TITLE.to_string());
 
     // Group words into chunks of 15
     let sentence_to_write_chunks = sentence_to_write_words
@@ -157,6 +177,7 @@ pub fn TypingWords() -> Element {
 
     rsx! {
         div { id: "TypingWords",
+            div { id: "TypingTitle", "{last_title}" }
             img { src: HEADER_MAIN, id: "main" }
             div { id: "timer", "{timer_value}" }
             div { id: "words",
@@ -245,6 +266,13 @@ pub fn TypingWords() -> Element {
     }
 }
 
+#[server(TitleServer)]
+async fn get_title() -> Result<String, ServerFnError> {
+    let last_title_req = get_last_title().await;
+    let last_title = last_title_req.lock().await;
+    Ok(last_title.clone())
+}
+
 #[server(TextServer)]
 async fn get_text() -> Result<String, ServerFnError> {
     let last_time_req = get_last_time_req().await;
@@ -261,7 +289,9 @@ async fn get_text() -> Result<String, ServerFnError> {
         }
     }
     let last_time_req_result = get_last_time_req_result().await;
+    let last_title_req = get_last_title().await;
     let mut last_time_result = last_time_req_result.lock().await;
+    let mut last_title = last_title_req.lock().await;
     if should_continue {
         let db = get_client_db().await;
 
@@ -288,6 +318,9 @@ async fn get_text() -> Result<String, ServerFnError> {
                     .replace(":", "")
                     .replace(";", "");
                 *last_time_result = filtered_story.clone();
+                if let Some(title) = latest_story.title {
+                    *last_title = title.clone();
+                }
                 Ok(filtered_story)
             }
             None => Err(ServerFnError::ServerError("No stories found".into())),
