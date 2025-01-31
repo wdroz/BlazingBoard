@@ -1,6 +1,10 @@
-<img src="./blazing_board/assets/logo_blazing_board.png" alt="Alt Text" width="300" height="200" />
+<h1 align="center">
+  <img src="./blazing_board/assets/logo_blazing_board.png" alt="Alt Text"/>
 
-[website](https://blazingboard.ch/)
+<div align="center">
+  <a href="https://blazingboard.ch/">website</a>
+</div>
+</h1>
 
 # BlazingBoard
 
