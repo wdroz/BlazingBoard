@@ -51,8 +51,8 @@ fn App() -> Element {
 pub fn TypingWords() -> Element {
     let mut current_chunk_index = use_signal(|| 0);
     let mut current_word_in_chunk_index = use_signal(|| 0);
-    let mut current_text = use_signal(|| String::new());
-    let mut user_words = use_signal(|| Vec::<String>::new());
+    let mut current_text = use_signal(String::new);
+    let mut user_words = use_signal(Vec::<String>::new);
     let mut start_typing_at = use_signal(|| None);
     let mut all_nb_correct = use_signal(|| 0);
     let mut all_nb_wrong = use_signal(|| 0);
