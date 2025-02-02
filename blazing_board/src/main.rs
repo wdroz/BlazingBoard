@@ -1,39 +1,21 @@
+mod models;
+
 use async_std::task::sleep;
 use dioxus::prelude::*;
 use jiff::Timestamp;
+use models::Story;
 use wasm_bindgen::prelude::*;
 
-use chrono::{DateTime, Utc};
 #[cfg(feature = "server")]
 use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection, FirestoreResult};
 #[cfg(feature = "server")]
 use futures::stream::StreamExt;
 
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use std::env;
 use std::sync::Arc;
 #[cfg(feature = "server")]
 use tokio::sync::{Mutex, OnceCell};
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Story {
-    sources: Vec<String>,
-    story: String,
-    title: Option<String>,
-    when: DateTime<Utc>,
-}
-
-impl Default for Story {
-    fn default() -> Story {
-        Story {
-            sources: vec!["https://doc.rust-lang.org/book/".to_string()],
-            story: include_str!("../assets/texts/01.txt").to_string(),
-            title: Some("The Rust Programming Language".to_string()),
-            when: Utc::now(),
-        }
-    }
-}
 
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
