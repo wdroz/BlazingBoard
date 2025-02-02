@@ -64,13 +64,13 @@ pub fn TypingWords() -> Element {
     let story = re_story().unwrap_or(Story {
         ..Default::default()
     });
+    let last_title = story.clone().title.clone().unwrap_or(DEFAULT_TITLE.to_string());
     let sentence_to_write_words = story
         .story
         .split_whitespace()
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
 
-    let last_title = story.title.unwrap_or(DEFAULT_TITLE.to_string());
 
     // Group words into chunks of 15
     let sentence_to_write_chunks = sentence_to_write_words
@@ -198,6 +198,14 @@ pub fn TypingWords() -> Element {
                 }
                 div { "time(s):  {nb_seconds}" }
                 div { "wpm:  {wpm:.0}" }
+                div {
+                    div { "Sources of the text" }
+                    for source in story.sources {
+                        div {
+                            a { href: source, "{last_title}" }
+                        }
+                    }
+                }
             }
         }
     }
