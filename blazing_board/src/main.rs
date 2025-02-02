@@ -3,37 +3,45 @@ use dioxus::prelude::*;
 use jiff::Timestamp;
 use wasm_bindgen::prelude::*;
 
-#[cfg(feature = "server")]
 use chrono::{DateTime, Utc};
 #[cfg(feature = "server")]
 use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection, FirestoreResult};
 #[cfg(feature = "server")]
 use futures::stream::StreamExt;
-#[cfg(feature = "server")]
+
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use std::env;
 use std::sync::Arc;
 #[cfg(feature = "server")]
 use tokio::sync::{Mutex, OnceCell};
-#[cfg(feature = "server")]
-#[cfg(feature = "server")]
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct Story {
+pub struct Story {
     sources: Vec<String>,
     story: String,
     title: Option<String>,
     when: DateTime<Utc>,
 }
 
+impl Default for Story {
+    fn default() -> Story {
+        Story {
+            sources: vec!["https://doc.rust-lang.org/book/".to_string()],
+            story: include_str!("../assets/texts/01.txt").to_string(),
+            title: Some("The Rust Programming Language".to_string()),
+            when: Utc::now(),
+        }
+    }
+}
+
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
 #[cfg(feature = "server")]
 static LAST_TIME_REQ: OnceCell<Arc<Mutex<i64>>> = OnceCell::const_new();
+
 #[cfg(feature = "server")]
-static LAST_TIME_REQ_RESULT: OnceCell<Arc<Mutex<String>>> = OnceCell::const_new();
-#[cfg(feature = "server")]
-static LAST_TITLE: OnceCell<Arc<Mutex<String>>> = OnceCell::const_new();
+static LAST_STORY: OnceCell<Arc<Mutex<Story>>> = OnceCell::const_new();
 
 const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
 const DEFAULT_TEXT: &str = include_str!("../assets/texts/01.txt");
@@ -72,27 +80,14 @@ async fn get_last_time_req() -> Arc<Mutex<i64>> {
 }
 
 #[cfg(feature = "server")]
-async fn initialize_last_time_req_result() -> Arc<Mutex<String>> {
-    Arc::new(Mutex::new(DEFAULT_TEXT.to_string()))
+async fn initialize_last_story() -> Arc<Mutex<Story>> {
+    Arc::new(Mutex::new(Story {
+        ..Default::default()
+    }))
 }
 #[cfg(feature = "server")]
-async fn get_last_time_req_result() -> Arc<Mutex<String>> {
-    LAST_TIME_REQ_RESULT
-        .get_or_init(initialize_last_time_req_result)
-        .await
-        .clone()
-}
-
-#[cfg(feature = "server")]
-async fn initialize_last_title() -> Arc<Mutex<String>> {
-    Arc::new(Mutex::new(DEFAULT_TITLE.to_string()))
-}
-#[cfg(feature = "server")]
-async fn get_last_title() -> Arc<Mutex<String>> {
-    LAST_TITLE
-        .get_or_init(initialize_last_title)
-        .await
-        .clone()
+async fn get_last_story() -> Arc<Mutex<Story>> {
+    LAST_STORY.get_or_init(initialize_last_story).await.clone()
 }
 
 #[component]
@@ -120,18 +115,21 @@ pub fn TypingWords() -> Element {
     let mut start_typing_at = use_signal(|| None);
     let mut all_nb_correct = use_signal(|| 0);
     let mut all_nb_wrong = use_signal(|| 0);
-
-    let response_sentence_to_write =
-        use_resource(|| async move { get_text().await.unwrap_or(NO_JS_MESSAGE.to_string()) });
-    let last_title_req =
-        use_resource(|| async move { get_title().await.unwrap_or(DEFAULT_TITLE.to_string()) });
-    let sentence_to_write_words = response_sentence_to_write()
-        .unwrap_or(NO_JS_MESSAGE.to_string())
+    let re_story = use_resource(|| async move {
+        get_story().await.unwrap_or(Story {
+            ..Default::default()
+        })
+    });
+    let story = re_story().unwrap_or(Story {
+        ..Default::default()
+    });
+    let sentence_to_write_words = story
+        .story
         .split_whitespace()
         .map(|w| w.to_string())
         .collect::<Vec<String>>();
 
-    let last_title = last_title_req().unwrap_or(DEFAULT_TITLE.to_string());
+    let last_title = story.title.unwrap_or(DEFAULT_TITLE.to_string());
 
     // Group words into chunks of 15
     let sentence_to_write_chunks = sentence_to_write_words
@@ -266,15 +264,8 @@ pub fn TypingWords() -> Element {
     }
 }
 
-#[server(TitleServer)]
-async fn get_title() -> Result<String, ServerFnError> {
-    let last_title_req = get_last_title().await;
-    let last_title = last_title_req.lock().await;
-    Ok(last_title.clone())
-}
-
-#[server(TextServer)]
-async fn get_text() -> Result<String, ServerFnError> {
+#[server(StoryServer)]
+async fn get_story() -> Result<Story, ServerFnError> {
     let last_time_req = get_last_time_req().await;
     let mut last_time = last_time_req.lock().await;
     let mut should_continue = false;
@@ -288,10 +279,8 @@ async fn get_text() -> Result<String, ServerFnError> {
             should_continue = true
         }
     }
-    let last_time_req_result = get_last_time_req_result().await;
-    let last_title_req = get_last_title().await;
-    let mut last_time_result = last_time_req_result.lock().await;
-    let mut last_title = last_title_req.lock().await;
+    let last_result_story = get_last_story().await;
+    let mut last_story = last_result_story.lock().await;
     if should_continue {
         let db = get_client_db().await;
 
@@ -317,16 +306,18 @@ async fn get_text() -> Result<String, ServerFnError> {
                     .replace(".", "")
                     .replace(":", "")
                     .replace(";", "");
-                *last_time_result = filtered_story.clone();
-                if let Some(title) = latest_story.title {
-                    *last_title = title.clone();
-                }
-                Ok(filtered_story)
+                *last_story = latest_story.clone();
+                Ok(Story {
+                    title: latest_story.title,
+                    sources: latest_story.sources,
+                    story: filtered_story,
+                    when: latest_story.when,
+                })
             }
             None => Err(ServerFnError::ServerError("No stories found".into())),
         }
     } else {
-        Ok((*last_time_result.clone()).to_string())
+        Ok(last_story.clone())
     }
 }
 
