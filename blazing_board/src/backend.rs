@@ -1,11 +1,9 @@
-use async_std::task::sleep;
 use dioxus::prelude::*;
 use jiff::Timestamp;
 use models::Story;
-use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "server")]
-use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection, FirestoreResult};
+use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection};
 #[cfg(feature = "server")]
 use futures::stream::StreamExt;
 

@@ -9,8 +9,6 @@ use wasm_bindgen::prelude::*;
 
 use backend::get_story;
 
-const NO_JS_MESSAGE: &str = "This site requires JavaScript to function properly";
-const DEFAULT_TEXT: &str = include_str!("../assets/texts/01.txt");
 const DEFAULT_TITLE: &str = "";
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -169,8 +167,6 @@ pub fn TypingWords() -> Element {
                                     current_chunk_index.set(current_chunk_index() + 1);
                                     all_nb_correct.set(all_nb_correct() + nb_correct);
                                     all_nb_wrong.set(all_nb_wrong() + nb_wrong);
-                                    nb_correct = 0;
-                                    nb_wrong = 0;
                                     user_words.set(vec![]);
                                 } else {
                                     current_word_in_chunk_index.set(next_word_index);
