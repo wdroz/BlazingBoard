@@ -6,7 +6,7 @@ name = "blazing_board"
 [web.app]
 
 # HTML title tag content
-title = "blazing_board"
+title = "BlazingBoard - Daily Story to Type"
 
 # include `assets` in web platform
 [web.resource]
