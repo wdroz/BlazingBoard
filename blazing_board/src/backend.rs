@@ -92,7 +92,8 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
                     .replace(",", "")
                     .replace(".", "")
                     .replace(":", "")
-                    .replace(";", "");
+                    .replace(";", "")
+                    .replace("’", "'");
                 *last_story = latest_story.clone();
                 Ok(Story {
                     title: latest_story.title,
