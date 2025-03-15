@@ -146,6 +146,11 @@ pub fn TypingWords() -> Element {
                     div { "{word}" }
                 }
             }
+            if timer_value() == 60 {
+                div { id: "tips",
+                    "Write as quickly as you can, pressing the space bar after each word."
+                }
+            }
             if current_chunk_index() < nb_chunks_to_write && timer_value() > 0 {
                 input {
                     id: "textUser",
