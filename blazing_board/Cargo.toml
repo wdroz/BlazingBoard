@@ -7,16 +7,16 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = "1.13.0"
+async-std = "1.13.2"
 dioxus = { version = "0.7", features = ["fullstack"] }
-firestore = { version = "0.44.0", optional = true}
+firestore = { version = "0.47.0", optional = true}
 dotenvy = { version = "0.15.7", optional = true}
-chrono = { version = "0.4.39", features = ["serde"] }
-jiff = { version = "0.1.19", features = ["js"] }
-serde = { version = "1.0.217"}
-tokio = { version = "1.43", optional = true }
+chrono = { version = "0.4.42", features = ["serde"] }
+jiff = { version = "0.2.16", features = ["js"] }
+serde = { version = "1.0.228"}
+tokio = { version = "1.48", optional = true }
 futures = { version = "0.3", optional = true }
-wasm-bindgen = "0.2.99"
+wasm-bindgen = "0.2.106"
 
 
 [features]
