@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
+#[cfg(feature = "server")]
 use jiff::Timestamp;
 use models::Story;
+#[cfg(feature = "server")]
+use std::sync::Arc;
 
 #[cfg(feature = "server")]
 use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection};
@@ -9,7 +12,6 @@ use futures::stream::StreamExt;
 
 #[cfg(feature = "server")]
 use std::env;
-use std::sync::Arc;
 #[cfg(feature = "server")]
 use tokio::sync::{Mutex, OnceCell};
 
@@ -23,6 +25,7 @@ static LAST_TIME_REQ: OnceCell<Arc<Mutex<i64>>> = OnceCell::const_new();
 #[cfg(feature = "server")]
 static LAST_STORY: OnceCell<Arc<Mutex<Story>>> = OnceCell::const_new();
 
+#[cfg(feature = "server")]
 pub fn get_timestamp_seconds_now() -> i64 {
     let now: Timestamp = Timestamp::now();
     now.as_second()
@@ -51,7 +54,7 @@ async fn get_last_story() -> Arc<Mutex<Story>> {
     LAST_STORY.get_or_init(initialize_last_story).await.clone()
 }
 
-#[server(StoryServer)]
+#[server]
 pub async fn get_story() -> Result<Story, ServerFnError> {
     let last_time_req = get_last_time_req().await;
     let mut last_time = last_time_req.lock().await;
@@ -81,7 +84,7 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
             .obj::<Story>()
             .stream_query()
             .await
-            .map_err::<ServerFnError, _>(|e| ServerFnError::ServerError(e.to_string()))?;
+            .map_err(|e| ServerFnError::new(e.to_string()))?;
 
         // Retrieve the latest story
         match story_stream.next().await {
@@ -102,7 +105,7 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
                     when: latest_story.when,
                 })
             }
-            None => Err(ServerFnError::ServerError("No stories found".into())),
+            None => Err(ServerFnError::new("No stories found")),
         }
     } else {
         Ok(last_story.clone())
