@@ -1,4 +1,4 @@
-FROM rust:bookworm AS builder
+FROM rust:trixie AS builder
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
@@ -13,9 +13,9 @@ RUN cargo install dioxus-cli --root /.cargo
 WORKDIR /app
 COPY . .
 WORKDIR /app/blazing_board
-RUN /.cargo/bin/dx bundle --platform web
+RUN /.cargo/bin/dx bundle --web --release
 
-FROM rust:bookworm AS runtime
+FROM rust:trixie AS runtime
 COPY --from=builder /app/blazing_board/target/dx/blazing_board/release/web/ /usr/local/app
 
 # set our port and make sure to listen for all connections
@@ -26,5 +26,5 @@ ENV IP=0.0.0.0
 EXPOSE 8080
 
 WORKDIR /usr/local/app
-ENTRYPOINT [ "/usr/local/app/server" ]
+ENTRYPOINT [ "/usr/local/app/blazing_board" ]
 
