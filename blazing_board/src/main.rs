@@ -2,6 +2,7 @@
 mod auth;
 mod backend;
 mod components;
+mod gamification;
 mod models;
 
 use async_std::task::sleep;
@@ -11,6 +12,10 @@ use components::{
     button::{Button, ButtonSize, ButtonVariant},
 };
 use dioxus::prelude::*;
+use gamification::{
+    Badge, LocalStats, PaceStatus, award_badges, complete_daily_challenge, current_challenge_date,
+    load_local_stats, pace_vs_best, record_combo_word, save_local_stats, update_personal_bests,
+};
 use jiff::Timestamp;
 use models::{PrivateProfile, Story, TypingSubmission, calculate_typing_metrics};
 use wasm_bindgen::prelude::*;
@@ -84,6 +89,20 @@ pub fn TypingWords() -> Element {
     let mut finished = use_signal(|| false);
     let mut submitted_run = use_signal(|| None::<String>);
     let mut save_message = use_signal(String::new);
+    let mut combo = use_signal(|| 0_i64);
+    let mut max_combo = use_signal(|| 0_i64);
+    let mut combo_milestone = use_signal(|| None::<i64>);
+    let mut local_stats = use_signal(LocalStats::default);
+    let mut local_stats_loaded = use_signal(|| false);
+    let mut processed_gamification_run = use_signal(|| None::<String>);
+    let mut new_badge = use_signal(|| None::<Badge>);
+    let mut new_personal_best = use_signal(|| false);
+    let challenge_date = use_signal(current_challenge_date);
+
+    use_effect(move || {
+        local_stats.set(load_local_stats());
+        local_stats_loaded.set(true);
+    });
 
     let re_story = use_resource(|| async move {
         get_story().await.unwrap_or(Story {
@@ -164,6 +183,40 @@ pub fn TypingWords() -> Element {
         }
     });
 
+    use_effect(move || {
+        let current_run_id = run_id();
+        let should_process = finished()
+            && local_stats_loaded()
+            && !current_run_id.is_empty()
+            && processed_gamification_run().as_deref() != Some(current_run_id.as_str());
+
+        if !should_process {
+            return;
+        }
+
+        processed_gamification_run.set(Some(current_run_id));
+        let Ok(run_metrics) =
+            calculate_typing_metrics(correct_words(), wrong_words(), duration_seconds().max(1))
+        else {
+            return;
+        };
+        let mut updated_stats = local_stats();
+        complete_daily_challenge(&mut updated_stats, &challenge_date());
+        new_personal_best.set(update_personal_bests(
+            &mut updated_stats,
+            run_metrics.wpm,
+            run_metrics.accuracy,
+            run_metrics.score,
+        ));
+        new_badge.set(award_badges(
+            &mut updated_stats,
+            run_metrics.accuracy,
+            run_metrics.wpm,
+        ));
+        save_local_stats(&updated_stats);
+        local_stats.set(updated_stats);
+    });
+
     let current_chunk = {
         let index = current_chunk_index();
         if index < nb_chunks_to_write {
@@ -188,13 +241,88 @@ pub fn TypingWords() -> Element {
         .unwrap_or(0.0);
     let wpm = metrics.map(|current| current.wpm).unwrap_or(0.0);
     let score = metrics.map(|current| current.score).unwrap_or(0);
+    let stats = local_stats();
+    let completed_today = stats.last_completion_date.as_deref() == Some(challenge_date().as_str());
+    let elapsed_seconds = if running() || finished() {
+        (TEST_DURATION_SECONDS - timer_value()).clamp(0, TEST_DURATION_SECONDS)
+    } else {
+        0
+    };
+    let pace = if running() {
+        pace_vs_best(correct_words(), elapsed_seconds, stats.best_wpm)
+    } else {
+        None
+    };
+    let combo_class = if combo_milestone().is_some() {
+        "combo-display combo-milestone"
+    } else if combo() > 0 {
+        "combo-display combo-active"
+    } else {
+        "combo-display"
+    };
+    let timer_class = if running() && timer_value() <= 5 {
+        "timer-urgent"
+    } else {
+        ""
+    };
+    let results_class = if new_personal_best() {
+        "results-record"
+    } else {
+        ""
+    };
 
     rsx! {
         div { id: "TypingWords",
             ProfileBar { profile: profile.clone() }
+            section { class: "daily-status", aria_label: "Daily challenge status",
+                div {
+                    span { class: "daily-label", "Daily challenge" }
+                    strong {
+                        if completed_today {
+                            "Complete for today"
+                        } else {
+                            "Ready to blaze"
+                        }
+                    }
+                }
+                div { class: "streak-count",
+                    span { aria_hidden: "true", "🔥" }
+                    strong { "{stats.streak}" }
+                    span { " day streak" }
+                }
+            }
+            if stats.best_score > 0 {
+                p { class: "personal-best",
+                    "Best {stats.best_wpm:.0} WPM · {stats.best_accuracy * 100.0:.0}% · {stats.best_score} pts"
+                }
+            }
             div { id: "TypingTitle", "{last_title}" }
             img { src: HEADER_MAIN, id: "brand-logo" }
-            div { id: "timer", "{timer_value}" }
+            div { id: "timer", class: "{timer_class}", "{timer_value}" }
+            div {
+                class: "{combo_class}",
+                span { class: "combo-flame", aria_hidden: "true", "🔥" }
+                strong { "{combo}" }
+                span { " word combo" }
+                if let Some(milestone) = combo_milestone() {
+                    em { role: "status", aria_live: "polite", "{milestone} word blaze!" }
+                }
+            }
+            if let Some(pace_status) = pace {
+                p {
+                    class: match pace_status {
+                        PaceStatus::Ahead => "pace-status pace-ahead",
+                        PaceStatus::Behind => "pace-status pace-behind",
+                        PaceStatus::Even => "pace-status pace-even",
+                    },
+                    role: "status",
+                    match pace_status {
+                        PaceStatus::Ahead => "Ahead of your best pace",
+                        PaceStatus::Behind => "Behind your best pace",
+                        PaceStatus::Even => "Matching your best pace",
+                    }
+                }
+            }
             div { id: "words",
                 for (i , word) in current_chunk.iter().enumerate() {
                     if i < current_word_in_chunk_index() {
@@ -243,14 +371,19 @@ pub fn TypingWords() -> Element {
                                 user_words.set(new_words);
 
                                 let word_index = current_word_in_chunk_index();
-                                if current_chunk_clone
+                                let is_correct = current_chunk_clone
                                     .get(word_index)
-                                    .is_some_and(|expected| expected == &typed_word)
-                                {
+                                    .is_some_and(|expected| expected == &typed_word);
+                                if is_correct {
                                     correct_words.set(correct_words() + 1);
                                 } else {
                                     wrong_words.set(wrong_words() + 1);
                                 }
+                                let combo_progress =
+                                    record_combo_word(combo(), max_combo(), is_correct);
+                                combo.set(combo_progress.current);
+                                max_combo.set(combo_progress.best);
+                                combo_milestone.set(combo_progress.milestone);
 
                                 let next_word_index = word_index + 1;
                                 if next_word_index >= current_chunk_clone.len() {
@@ -289,8 +422,11 @@ pub fn TypingWords() -> Element {
                     aria_label: "Type the highlighted word",
                 }
             } else {
-                section { id: "results",
+                section { id: "results", class: "{results_class}",
                     h2 { "Run complete" }
+                    if new_personal_best() {
+                        p { class: "record-banner", role: "status", "New personal best!" }
+                    }
                     div { class: "result-grid",
                         ResultStat { label: "WPM", value: format!("{wpm:.0}") }
                         ResultStat {
@@ -301,6 +437,21 @@ pub fn TypingWords() -> Element {
                         ResultStat {
                             label: "Time",
                             value: format!("{}s", duration_seconds()),
+                        }
+                    }
+                    p { class: "combo-summary", "Best combo: 🔥 {max_combo}" }
+                    if let Some(badge) = new_badge() {
+                        section { class: "new-badge", aria_live: "polite",
+                            span { "New badge" }
+                            strong { "{badge.title()}" }
+                            p { "{badge.description()}" }
+                        }
+                    }
+                    if !stats.earned_badges.is_empty() {
+                        div { class: "badge-shelf", aria_label: "Earned badges",
+                            for badge in stats.earned_badges.iter().copied() {
+                                AchievementBadge { badge }
+                            }
                         }
                     }
                     Button {
@@ -320,6 +471,12 @@ pub fn TypingWords() -> Element {
                             finished.set(false);
                             submitted_run.set(None);
                             save_message.set(String::new());
+                            combo.set(0);
+                            max_combo.set(0);
+                            combo_milestone.set(None);
+                            processed_gamification_run.set(None);
+                            new_badge.set(None);
+                            new_personal_best.set(false);
                         },
                         "Try again"
                     }
@@ -389,6 +546,16 @@ fn ResultStat(label: &'static str, value: String) -> Element {
         div { class: "result-stat",
             strong { "{value}" }
             span { "{label}" }
+        }
+    }
+}
+
+#[component]
+fn AchievementBadge(badge: Badge) -> Element {
+    rsx! {
+        div { class: "achievement-badge", title: "{badge.description()}",
+            span { aria_hidden: "true", "✦" }
+            strong { "{badge.title()}" }
         }
     }
 }

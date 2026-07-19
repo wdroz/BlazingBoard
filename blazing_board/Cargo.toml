@@ -17,10 +17,12 @@ jiff = { version = "0.2.16", features = ["js"] }
 oauth2 = { version = "5.0.0", features = ["reqwest"], optional = true }
 reqwest = { version = "0.12.28", default-features = false, features = ["json", "rustls-tls"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 sha2 = { version = "0.10.9", optional = true }
 tokio = { version = "1.48", optional = true }
 futures = { version = "0.3", optional = true }
 wasm-bindgen = "0.2.106"
+web-sys = { version = "0.3.83", features = ["Storage", "Window"] }
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 
 

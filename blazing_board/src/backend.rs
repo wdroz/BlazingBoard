@@ -1,12 +1,12 @@
-use dioxus::prelude::*;
 #[cfg(feature = "server")]
-use jiff::Timestamp;
+use chrono::{Duration, NaiveDate, NaiveTime, Utc};
+use dioxus::prelude::*;
 use models::{PrivateProfile, Story, TypingResult, TypingSubmission};
 #[cfg(feature = "server")]
 use std::sync::Arc;
 
 #[cfg(feature = "server")]
-use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection};
+use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreQueryDirection, FirestoreTimestamp};
 #[cfg(feature = "server")]
 use futures::stream::StreamExt;
 
@@ -30,95 +30,66 @@ const TYPING_RESULTS_COLLECTION: &str = "typing_results";
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
 #[cfg(feature = "server")]
-static LAST_TIME_REQ: OnceCell<Arc<Mutex<i64>>> = OnceCell::const_new();
+static LAST_STORY: OnceCell<Arc<Mutex<Option<(NaiveDate, Story)>>>> = OnceCell::const_new();
 
 #[cfg(feature = "server")]
-static LAST_STORY: OnceCell<Arc<Mutex<Story>>> = OnceCell::const_new();
-
-#[cfg(feature = "server")]
-pub fn get_timestamp_seconds_now() -> i64 {
-    let now: Timestamp = Timestamp::now();
-    now.as_second()
-}
-
-#[cfg(feature = "server")]
-async fn initialize_last_time_req() -> Arc<Mutex<i64>> {
-    Arc::new(Mutex::new(0))
+async fn initialize_last_story() -> Arc<Mutex<Option<(NaiveDate, Story)>>> {
+    Arc::new(Mutex::new(None))
 }
 #[cfg(feature = "server")]
-async fn get_last_time_req() -> Arc<Mutex<i64>> {
-    LAST_TIME_REQ
-        .get_or_init(initialize_last_time_req)
-        .await
-        .clone()
-}
-
-#[cfg(feature = "server")]
-async fn initialize_last_story() -> Arc<Mutex<Story>> {
-    Arc::new(Mutex::new(Story {
-        ..Default::default()
-    }))
-}
-#[cfg(feature = "server")]
-async fn get_last_story() -> Arc<Mutex<Story>> {
+async fn get_last_story() -> Arc<Mutex<Option<(NaiveDate, Story)>>> {
     LAST_STORY.get_or_init(initialize_last_story).await.clone()
 }
 
 #[server]
 pub async fn get_story() -> Result<Story, ServerFnError> {
-    let last_time_req = get_last_time_req().await;
-    let mut last_time = last_time_req.lock().await;
-    let mut should_continue = false;
-    if *last_time == 0i64 {
-        *last_time = get_timestamp_seconds_now();
-        should_continue = true;
-    } else {
-        let current = get_timestamp_seconds_now();
-        if (current - *last_time) > 60 * 60 {
-            *last_time = get_timestamp_seconds_now();
-            should_continue = true
-        }
-    }
+    let challenge_date = Utc::now().date_naive();
     let last_result_story = get_last_story().await;
     let mut last_story = last_result_story.lock().await;
-    if should_continue {
-        let db = get_client_db().await;
+    if let Some((cached_date, story)) = last_story.as_ref()
+        && *cached_date == challenge_date
+    {
+        return Ok(story.clone());
+    }
 
-        // Query the 'stories' collection for the latest story
-        let mut story_stream = db
-            .fluent()
-            .select()
-            .from("texts")
-            .order_by([("when", FirestoreQueryDirection::Descending)])
-            .limit(1)
-            .obj::<Story>()
-            .stream_query()
-            .await
-            .map_err(|e| ServerFnError::new(e.to_string()))?;
+    let db = get_client_db().await;
+    // Same cutoff on every instance: latest story published before tomorrow UTC.
+    let next_day = (challenge_date + Duration::days(1))
+        .and_time(NaiveTime::MIN)
+        .and_utc();
 
-        // Retrieve the latest story
-        match story_stream.next().await {
-            Some(latest_story) => {
-                let filtered_story = latest_story
-                    .story
-                    .replace('\n', " ")
-                    .replace(",", "")
-                    .replace(".", "")
-                    .replace(":", "")
-                    .replace(";", "")
-                    .replace("’", "'");
-                *last_story = latest_story.clone();
-                Ok(Story {
-                    title: latest_story.title,
-                    sources: latest_story.sources,
-                    story: filtered_story,
-                    when: latest_story.when,
-                })
-            }
-            None => Err(ServerFnError::new("No stories found")),
+    let mut story_stream = db
+        .fluent()
+        .select()
+        .from("texts")
+        .filter(|q| q.field("when").less_than(FirestoreTimestamp(next_day)))
+        .order_by([("when", FirestoreQueryDirection::Descending)])
+        .limit(1)
+        .obj::<Story>()
+        .stream_query()
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    match story_stream.next().await {
+        Some(latest_story) => {
+            let filtered_story = latest_story
+                .story
+                .replace('\n', " ")
+                .replace(",", "")
+                .replace(".", "")
+                .replace(":", "")
+                .replace(";", "")
+                .replace("’", "'");
+            let daily_story = Story {
+                title: latest_story.title,
+                sources: latest_story.sources,
+                story: filtered_story,
+                when: latest_story.when,
+            };
+            *last_story = Some((challenge_date, daily_story.clone()));
+            Ok(daily_story)
         }
-    } else {
-        Ok(last_story.clone())
+        None => Err(ServerFnError::new("No stories found")),
     }
 }
 

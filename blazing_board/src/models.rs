@@ -15,7 +15,10 @@ impl Default for Story {
             sources: vec!["https://doc.rust-lang.org/book/".to_string()],
             story: include_str!("../assets/texts/01.txt").to_string(),
             title: Some("The Rust Programming Language".to_string()),
-            when: Utc::now(),
+            // Stable fallback so SSR/client and save_typing_result story_when checks agree.
+            when: DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+                .expect("fallback story timestamp")
+                .with_timezone(&Utc),
         }
     }
 }
