@@ -1,92 +1,323 @@
-/* App-wide styling */
+:root {
+    color-scheme: dark;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1116;
+    color: #f7f7f8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
-    background-color: #0f1116;
-    color: #ffffff;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 20px;
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(225, 91, 45, 0.12), transparent 35rem),
+        #0f1116;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button {
+    cursor: pointer !important;
+}
+
+a {
+    color: #f4a261;
 }
 
 #TypingWords {
-    margin: 0;
     display: flex;
+    width: calc(100% - 2rem);
+    max-width: 760px;
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 5rem 0 3rem;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    position: absolute; /* or fixed */
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    gap: 1rem;
 }
 
-#main {
-    width: 300px;
+#TypingTitle {
+    min-height: 1.5rem;
+    color: #aeb3c2;
+    font-size: 0.95rem;
+    text-align: center;
+}
+
+#brand-logo {
+    width: min(300px, 75vw);
+    height: auto;
 }
 
 #gh {
-    position: absolute; /* Allows positioning */
-    top: 10px; /* Adjust as needed */
-    right: 10px; /* Adjust as needed */
-    display: flex; /* Aligns the image and text inline */
-    align-items: center; /* Aligns image and text vertically */
-    text-decoration: none; /* Removes underline from the link */
-    color: #000; /* Set the default link color */
+    position: fixed;
+    z-index: 2;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #aeb3c2;
+    font-size: 0.8rem;
+    text-decoration: none;
+}
+
+#gh:hover,
+#gh:active,
+#gh:visited {
+    color: #fff;
 }
 
 #gh img {
-    width: 20px; /* Adjust the size of the image */
-    height: auto; /* Keeps the aspect ratio */
-    margin-right: 5px; /* Space between the image and the text */
+    width: 20px;
+    height: 20px;
 }
 
-#gh span {
-    font-size: 14px; /* Adjust the text size */
-    color: inherit; /* Inherit color from parent (#gh) */
+.profile-bar {
+    position: absolute;
+    top: 1rem;
+    left: max(1rem, calc(50% - 380px));
+    display: flex;
+    min-height: 2rem;
+    align-items: center;
 }
 
-/* Style for visited links */
-#gh:visited {
-    color: #ffffff; /* Ensure the visited link color matches the normal link color */
+.profile-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #d9dce5;
+    font-size: 0.9rem;
 }
 
-/* Optionally add hover and active styles for consistency */
-#gh:hover {
-    color: #ffffff; /* Change the color on hover (optional) */
+.profile-bar:has(.profile-identity) {
+    gap: 0.5rem;
 }
 
-#gh:active {
-    color: #ffffff; /* Change the color when the link is active (optional) */
+.profile-bar form {
+    margin: 0;
+}
+
+#timer {
+    color: #f4a261;
+    font-size: 2.25rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    line-height: 1;
+}
+
+#words {
+    display: flex;
+    width: 100%;
+    min-height: 8.5rem;
+    padding: 1.25rem;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.55rem 0.65rem;
+    overflow: hidden;
+    border: 1px solid #2b2f3a;
+    border-radius: 0.85rem;
+    background: rgba(31, 34, 43, 0.88);
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.2);
+    font-size: 1.05rem;
+    line-height: 1.45;
+}
+
+#words > div {
+    padding: 0.08rem 0.2rem;
+    border-radius: 0.22rem;
 }
 
 .break {
     flex-basis: 100%;
     height: 0;
-  }
-
-#words {
-    width: 450px; /* Keep this as the desired width */
-    height: auto;
-    display: flex;
-    flex-wrap: wrap; /* Allow items to wrap within the container */
-    gap: 10px; /* Keep the spacing between the words */
-    overflow-y: auto; /* Enable vertical scrolling if the content overflows */
-    padding: 10px; /* Add padding for better spacing */
-    background-color: #1f1f1f; /* Optional: background color for distinction */
-    border-radius: 10px; /* Optional: rounded corners for aesthetics */
+    padding: 0 !important;
 }
-
 
 #current {
-    background-color: cadetblue;
-}
-
-.previous {
-    background-color: darkgray;
+    background: #2c6670;
+    box-shadow: 0 0 0 2px rgba(95, 158, 160, 0.2);
 }
 
 .previous_wrong {
-    background-color:red
+    background: #842f37;
+    color: #fff;
 }
 
 .previous_correct {
-    background-color:green
+    background: #23663f;
+    color: #fff;
+}
+
+#tips,
+.save-message {
+    margin: 0;
+    color: #9298a8;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+#textUser {
+    width: min(100%, 32rem);
+    padding: 0.8rem 1rem;
+    border: 1px solid #3d4351;
+    border-radius: 0.65rem;
+    outline: none;
+    background: #171a21;
+    color: #fff;
+    font-size: 1.05rem;
+}
+
+#textUser:focus {
+    border-color: #e15b2d;
+    box-shadow: 0 0 0 3px rgba(225, 91, 45, 0.18);
+}
+
+#results,
+.history-panel {
+    width: 100%;
+    padding: 1.25rem;
+    border: 1px solid #2b2f3a;
+    border-radius: 0.85rem;
+    background: #171a21;
+}
+
+#results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+#results h2,
+.history-panel h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.result-grid {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.result-stat {
+    display: flex;
+    padding: 0.8rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    border-radius: 0.6rem;
+    background: #20242d;
+}
+
+.result-stat strong {
+    color: #f4a261;
+    font-size: 1.35rem;
+}
+
+.result-stat span {
+    color: #9298a8;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.history-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.profile-summary,
+.history-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    color: #aeb3c2;
+    font-size: 0.85rem;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.history-row {
+    display: flex;
+    padding: 0.75rem 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 1px solid #292d37;
+}
+
+.history-row > div:first-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.history-row strong {
+    color: #f4a261;
+}
+
+.history-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sources {
+    display: flex;
+    margin-top: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    color: #9298a8;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+    #TypingWords {
+        width: calc(100% - 1rem);
+        padding-top: 6rem;
+    }
+
+    .profile-bar {
+        left: 0.5rem;
+    }
+
+    #gh span {
+        display: none;
+    }
+
+    #words {
+        min-height: 10.5rem;
+        padding: 1rem;
+    }
+
+    .result-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .history-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
 }

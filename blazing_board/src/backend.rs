@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use jiff::Timestamp;
-use models::Story;
+use models::{PrivateProfile, Story, TypingResult, TypingSubmission};
 #[cfg(feature = "server")]
 use std::sync::Arc;
 
@@ -16,6 +16,16 @@ use std::env;
 use tokio::sync::{Mutex, OnceCell};
 
 use crate::models;
+#[cfg(feature = "server")]
+use crate::{
+    auth::authenticated_user_id,
+    models::{UserProfile, calculate_typing_metrics, validate_run_id},
+};
+
+#[cfg(feature = "server")]
+const USERS_COLLECTION: &str = "users";
+#[cfg(feature = "server")]
+const TYPING_RESULTS_COLLECTION: &str = "typing_results";
 
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
@@ -112,8 +122,174 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
     }
 }
 
+#[get(
+    "/api/profile",
+    headers: dioxus::prelude::dioxus_fullstack::HeaderMap
+)]
+pub async fn get_private_profile() -> Result<Option<PrivateProfile>, ServerFnError> {
+    let Some(user_id) = authenticated_user_id(&headers)
+        .await
+        .map_err(private_server_error)?
+    else {
+        return Ok(None);
+    };
+
+    let db = get_client_db().await;
+    let user = db
+        .fluent()
+        .select()
+        .by_id_in(USERS_COLLECTION)
+        .obj::<UserProfile>()
+        .one(&user_id)
+        .await
+        .map_err(private_server_error)?
+        .ok_or_else(|| ServerFnError::new("The signed-in profile no longer exists"))?;
+    let parent = db
+        .parent_path(USERS_COLLECTION, &user_id)
+        .map_err(private_server_error)?;
+    let history = db
+        .fluent()
+        .select()
+        .from(TYPING_RESULTS_COLLECTION)
+        .parent(&parent)
+        .order_by([(
+            "created_at_epoch_seconds",
+            FirestoreQueryDirection::Descending,
+        )])
+        .limit(20)
+        .obj::<TypingResult>()
+        .query()
+        .await
+        .map_err(private_server_error)?;
+
+    Ok(Some(PrivateProfile { user, history }))
+}
+
+#[post(
+    "/api/typing-results",
+    headers: dioxus::prelude::dioxus_fullstack::HeaderMap
+)]
+pub async fn save_typing_result(
+    submission: TypingSubmission,
+) -> Result<TypingResult, ServerFnError> {
+    let user_id = authenticated_user_id(&headers)
+        .await
+        .map_err(private_server_error)?
+        .ok_or_else(|| ServerFnError::new("Sign in to save typing history"))?;
+
+    validate_run_id(&submission.run_id).map_err(ServerFnError::new)?;
+    let metrics = calculate_typing_metrics(
+        submission.correct_words,
+        submission.wrong_words,
+        submission.duration_seconds,
+    )
+    .map_err(ServerFnError::new)?;
+
+    let story = get_story().await?;
+    if story.when.timestamp() != submission.story_when.timestamp() {
+        return Err(ServerFnError::new(
+            "The typing story changed before this result was saved",
+        ));
+    }
+
+    let created_at = chrono::Utc::now();
+    let result = TypingResult {
+        run_id: submission.run_id,
+        story_title: story.title.unwrap_or_else(|| "Daily story".to_string()),
+        story_when: story.when,
+        correct_words: submission.correct_words,
+        wrong_words: submission.wrong_words,
+        duration_seconds: submission.duration_seconds,
+        accuracy: metrics.accuracy,
+        wpm: metrics.wpm,
+        score: metrics.score,
+        created_at,
+        created_at_epoch_seconds: created_at.timestamp(),
+    };
+
+    save_result_transaction(&user_id, result)
+        .await
+        .map_err(private_server_error)
+}
+
 #[cfg(feature = "server")]
-async fn get_client_db() -> &'static FirestoreDb {
+async fn save_result_transaction(
+    user_id: &str,
+    result: TypingResult,
+) -> firestore::FirestoreResult<TypingResult> {
+    let db = get_client_db().await;
+    let user_id = user_id.to_string();
+
+    db.run_transaction(move |db, transaction| {
+        let user_id = user_id.clone();
+        let result = result.clone();
+        Box::pin(async move {
+            let parent = db.parent_path(USERS_COLLECTION, &user_id)?;
+            let existing = db
+                .fluent()
+                .select()
+                .by_id_in(TYPING_RESULTS_COLLECTION)
+                .parent(&parent)
+                .obj::<TypingResult>()
+                .one(&result.run_id)
+                .await?;
+            if let Some(existing) = existing {
+                return Ok(existing);
+            }
+
+            let mut user = db
+                .fluent()
+                .select()
+                .by_id_in(USERS_COLLECTION)
+                .obj::<UserProfile>()
+                .one(&user_id)
+                .await?
+                .ok_or_else(|| {
+                    firestore::errors::FirestoreError::DataNotFoundError(
+                        firestore::errors::FirestoreDataNotFoundError {
+                            public: firestore::errors::FirestoreErrorPublicGenericDetails {
+                                code: "profile_missing".to_string(),
+                            },
+                            data_detail_message: format!(
+                                "Authenticated profile {user_id} no longer exists"
+                            ),
+                        },
+                    )
+                })?;
+
+            user.total_runs += 1;
+            user.best_wpm = user.best_wpm.max(result.wpm);
+            user.best_accuracy = user.best_accuracy.max(result.accuracy);
+            user.best_score = user.best_score.max(result.score);
+
+            db.fluent()
+                .update()
+                .in_col(TYPING_RESULTS_COLLECTION)
+                .document_id(&result.run_id)
+                .parent(&parent)
+                .object(&result)
+                .add_to_transaction(transaction)?;
+            db.fluent()
+                .update()
+                .in_col(USERS_COLLECTION)
+                .document_id(&user_id)
+                .object(&user)
+                .add_to_transaction(transaction)?;
+
+            Ok(result)
+        })
+    })
+    .await
+}
+
+#[cfg(feature = "server")]
+fn private_server_error(error: impl std::fmt::Display) -> ServerFnError {
+    eprintln!("Private server operation failed: {error}");
+    ServerFnError::new("The server could not complete this request")
+}
+
+#[cfg(feature = "server")]
+pub(crate) async fn get_client_db() -> &'static FirestoreDb {
     CLIENT
         .get_or_init(|| async {
             dotenvy::dotenv().ok();
