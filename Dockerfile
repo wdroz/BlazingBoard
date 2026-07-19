@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
     openssl \
     git
 
-# Install dioxus-cli with specific features
-RUN cargo install dioxus-cli --root /.cargo
+# --locked pins deps from dioxus-cli's Cargo.lock (avoids git2 0.21 / auth-git2 breakage)
+RUN cargo install dioxus-cli --locked --root /.cargo
 
 WORKDIR /app
 COPY . .
