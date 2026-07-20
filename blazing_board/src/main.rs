@@ -6,7 +6,9 @@ mod gamification;
 mod models;
 
 use async_std::task::sleep;
-use backend::{get_private_profile, get_story, save_typing_result};
+use backend::{
+    get_leaderboard, get_private_profile, get_recent_leaderboard_days, get_story, save_typing_result,
+};
 use components::{
     avatar::{AvatarImageSize, ImageAvatar},
     button::{Button, ButtonSize, ButtonVariant},
@@ -17,7 +19,9 @@ use gamification::{
     load_local_stats, pace_vs_best, record_combo_word, save_local_stats, update_personal_bests,
 };
 use jiff::Timestamp;
-use models::{PrivateProfile, Story, TypingSubmission, calculate_typing_metrics};
+use models::{
+    Leaderboard, LeaderboardScope, PrivateProfile, Story, TypingSubmission, calculate_typing_metrics,
+};
 use wasm_bindgen::prelude::*;
 
 const DEFAULT_TITLE: &str = "";
@@ -111,6 +115,22 @@ pub fn TypingWords() -> Element {
     });
     let profile_resource =
         use_resource(|| async move { get_private_profile().await.unwrap_or(None) });
+    let mut leaderboard_scope = use_signal(|| LeaderboardScope::Day);
+    let mut leaderboard_day = use_signal(current_challenge_date);
+    let recent_days_resource = use_resource(|| async move {
+        get_recent_leaderboard_days()
+            .await
+            .unwrap_or_else(|_| vec![current_challenge_date()])
+    });
+    let leaderboard_resource = use_resource(move || {
+        let scope = leaderboard_scope();
+        let day = leaderboard_day();
+        async move {
+            get_leaderboard(scope.as_str().to_string(), Some(day))
+                .await
+                .ok()
+        }
+    });
 
     let story = re_story().unwrap_or(Story {
         ..Default::default()
@@ -168,12 +188,14 @@ pub fn TypingWords() -> Element {
                 duration_seconds: duration_seconds(),
             };
             let mut profile_resource = profile_resource;
+            let mut leaderboard_resource = leaderboard_resource;
 
             spawn(async move {
                 match save_typing_result(submission).await {
                     Ok(_) => {
                         save_message.set("Saved to your private history.".to_string());
                         profile_resource.restart();
+                        leaderboard_resource.restart();
                     }
                     Err(_) => {
                         save_message.set("This result could not be saved.".to_string());
@@ -493,6 +515,16 @@ pub fn TypingWords() -> Element {
                     HistoryPanel { profile: private_profile }
                 }
 
+                LeaderboardPanel {
+                    board: leaderboard_resource().flatten(),
+                    scope: leaderboard_scope(),
+                    selected_day: leaderboard_day(),
+                    recent_days: recent_days_resource()
+                        .unwrap_or_else(|| vec![leaderboard_day()]),
+                    on_scope: move |scope| leaderboard_scope.set(scope),
+                    on_day: move |day| leaderboard_day.set(day),
+                }
+
                 div { class: "sources",
                     div { "Text sources" }
                     for source in story.sources {
@@ -588,6 +620,91 @@ fn HistoryPanel(profile: PrivateProfile) -> Element {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn LeaderboardPanel(
+    board: Option<Leaderboard>,
+    scope: LeaderboardScope,
+    selected_day: String,
+    recent_days: Vec<String>,
+    on_scope: EventHandler<LeaderboardScope>,
+    on_day: EventHandler<String>,
+) -> Element {
+    rsx! {
+        section { class: "leaderboard-panel",
+            h2 { "Leaderboard" }
+            div { class: "leaderboard-tabs", role: "tablist", aria_label: "Leaderboard period",
+                button {
+                    class: if scope == LeaderboardScope::Day { "leaderboard-tab active" } else { "leaderboard-tab" },
+                    r#type: "button",
+                    role: "tab",
+                    aria_selected: scope == LeaderboardScope::Day,
+                    onclick: move |_| on_scope.call(LeaderboardScope::Day),
+                    "Day"
+                }
+                button {
+                    class: if scope == LeaderboardScope::Week { "leaderboard-tab active" } else { "leaderboard-tab" },
+                    r#type: "button",
+                    role: "tab",
+                    aria_selected: scope == LeaderboardScope::Week,
+                    onclick: move |_| on_scope.call(LeaderboardScope::Week),
+                    "Week"
+                }
+                button {
+                    class: if scope == LeaderboardScope::Global { "leaderboard-tab active" } else { "leaderboard-tab" },
+                    r#type: "button",
+                    role: "tab",
+                    aria_selected: scope == LeaderboardScope::Global,
+                    onclick: move |_| on_scope.call(LeaderboardScope::Global),
+                    "Global"
+                }
+            }
+            if scope == LeaderboardScope::Day {
+                div { class: "leaderboard-day-picker",
+                    label { r#for: "leaderboard-day", "Challenge day" }
+                    select {
+                        id: "leaderboard-day",
+                        value: "{selected_day}",
+                        onchange: move |event| on_day.call(event.value()),
+                        for day in recent_days.iter() {
+                            option { value: "{day}", selected: *day == selected_day, "{day}" }
+                        }
+                    }
+                }
+            }
+            if let Some(board) = board {
+                p { class: "leaderboard-label", "{board.label}" }
+                if board.entries.is_empty() {
+                    p { class: "leaderboard-empty", "No ranked runs yet. Be the first." }
+                } else {
+                    div { class: "leaderboard-list",
+                        for entry in board.entries.iter() {
+                            div { class: "leaderboard-row", key: "{entry.github_id}-{entry.run_id}",
+                                span { class: "leaderboard-rank", "#{entry.rank}" }
+                                ImageAvatar {
+                                    size: AvatarImageSize::Small,
+                                    src: entry.avatar_url.clone(),
+                                    alt: format!("{}'s GitHub avatar", entry.login),
+                                    "{entry.login.chars().next().unwrap_or('?')}"
+                                }
+                                div { class: "leaderboard-identity",
+                                    strong { "@{entry.login}" }
+                                    span { "{entry.score} pts" }
+                                }
+                                div { class: "leaderboard-metrics",
+                                    span { "{entry.wpm:.0} WPM" }
+                                    span { "{entry.accuracy * 100.0:.0}%" }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                p { class: "leaderboard-empty", "Loading rankings…" }
             }
         }
     }
