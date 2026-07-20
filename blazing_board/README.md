@@ -48,7 +48,9 @@ oauth_states/{oauth_state_hash}
 
 Each leaderboard entry stores a signed-in player's best public score for that board (score, WPM, accuracy, GitHub login/avatar). Full typing history stays private under `users/{id}/typing_results`.
 
-Public leaderboards are served from an in-memory server cache (45s TTL, invalidated when a better score is saved) so repeated reads avoid Firestore queries. Day boards are limited to the latest 10 UTC challenge days.
+Public leaderboards are served from an in-memory server cache (45s TTL, invalidated when a better score is saved) so repeated reads avoid Firestore queries. Day boards and playable challenges are limited to the latest 10 UTC challenge days. Boards are keyed by the UTC challenge day you play, not the story document's publish timestamp.
+
+Players can load and redo any of those 10 days from the challenge-day picker. Streaks only advance when completing today's challenge.
 
 Typing history is private and is accessed only through authenticated server functions. WPM, accuracy, and score are recomputed on the server. The score is `round(WPM × accuracy)`.
 

@@ -520,7 +520,8 @@ a {
     background: rgba(225, 91, 45, 0.12);
 }
 
-.leaderboard-day-picker {
+.leaderboard-day-picker,
+.challenge-day-picker {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -529,7 +530,8 @@ a {
     font-size: 0.85rem;
 }
 
-.leaderboard-day-picker select {
+.leaderboard-day-picker select,
+.challenge-day-picker select {
     min-width: 9rem;
     padding: 0.35rem 0.55rem;
     border: 1px solid #3d4351;

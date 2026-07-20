@@ -67,6 +67,8 @@ pub struct TypingResult {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct TypingSubmission {
     pub run_id: String,
+    /// UTC challenge day (`YYYY-MM-DD`) this run belongs to.
+    pub challenge_date: String,
     pub story_when: DateTime<Utc>,
     pub correct_words: i64,
     pub wrong_words: i64,

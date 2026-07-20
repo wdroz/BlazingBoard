@@ -46,7 +46,7 @@ const LEADERBOARD_CACHE_TTL: StdDuration = StdDuration::from_secs(45);
 #[cfg(feature = "server")]
 static CLIENT: OnceCell<FirestoreDb> = OnceCell::const_new();
 #[cfg(feature = "server")]
-static LAST_STORY: OnceCell<Arc<Mutex<Option<(NaiveDate, Story)>>>> = OnceCell::const_new();
+static STORY_CACHE: OnceCell<Arc<Mutex<HashMap<NaiveDate, Story>>>> = OnceCell::const_new();
 #[cfg(feature = "server")]
 static LEADERBOARD_CACHE: OnceCell<Arc<Mutex<HashMap<String, CachedLeaderboard>>>> =
     OnceCell::const_new();
@@ -59,12 +59,13 @@ struct CachedLeaderboard {
 }
 
 #[cfg(feature = "server")]
-async fn initialize_last_story() -> Arc<Mutex<Option<(NaiveDate, Story)>>> {
-    Arc::new(Mutex::new(None))
+async fn initialize_story_cache() -> Arc<Mutex<HashMap<NaiveDate, Story>>> {
+    Arc::new(Mutex::new(HashMap::new()))
 }
+
 #[cfg(feature = "server")]
-async fn get_last_story() -> Arc<Mutex<Option<(NaiveDate, Story)>>> {
-    LAST_STORY.get_or_init(initialize_last_story).await.clone()
+async fn get_story_cache() -> Arc<Mutex<HashMap<NaiveDate, Story>>> {
+    STORY_CACHE.get_or_init(initialize_story_cache).await.clone()
 }
 
 #[cfg(feature = "server")]
@@ -80,19 +81,48 @@ async fn get_leaderboard_cache() -> Arc<Mutex<HashMap<String, CachedLeaderboard>
         .clone()
 }
 
-#[server]
-pub async fn get_story() -> Result<Story, ServerFnError> {
-    let challenge_date = Utc::now().date_naive();
-    let last_result_story = get_last_story().await;
-    let mut last_story = last_result_story.lock().await;
-    if let Some((cached_date, story)) = last_story.as_ref()
-        && *cached_date == challenge_date
+#[get("/api/story?day")]
+pub async fn get_story(day: Option<String>) -> Result<Story, ServerFnError> {
+    let today = Utc::now().date_naive();
+    let challenge_date = resolve_challenge_day(day.as_deref(), today)?;
+
+    let cache = get_story_cache().await;
     {
-        return Ok(story.clone());
+        let guard = cache.lock().await;
+        if let Some(story) = guard.get(&challenge_date) {
+            return Ok(story.clone());
+        }
     }
 
+    let story = load_story_for_day(challenge_date)
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+    cache.lock().await.insert(challenge_date, story.clone());
+    Ok(story)
+}
+
+#[cfg(feature = "server")]
+fn resolve_challenge_day(
+    day: Option<&str>,
+    today: NaiveDate,
+) -> Result<NaiveDate, ServerFnError> {
+    let challenge_date = match day {
+        Some(value) => parse_challenge_date(value)
+            .ok_or_else(|| ServerFnError::new("Challenge day must use YYYY-MM-DD"))?,
+        None => today,
+    };
+    if !is_allowed_recent_day(challenge_date, today) {
+        return Err(ServerFnError::new(format!(
+            "Challenges are limited to the latest {RECENT_LEADERBOARD_DAYS} UTC days"
+        )));
+    }
+    Ok(challenge_date)
+}
+
+#[cfg(feature = "server")]
+async fn load_story_for_day(challenge_date: NaiveDate) -> Result<Story, String> {
     let db = get_client_db().await;
-    // Same cutoff on every instance: latest story published before tomorrow UTC.
+    // Story active on challenge_date: latest text published before the next UTC midnight.
     let next_day = (challenge_date + Duration::days(1))
         .and_time(NaiveTime::MIN)
         .and_utc();
@@ -107,7 +137,7 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
         .obj::<Story>()
         .stream_query()
         .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
+        .map_err(|e| e.to_string())?;
 
     match story_stream.next().await {
         Some(latest_story) => {
@@ -119,16 +149,14 @@ pub async fn get_story() -> Result<Story, ServerFnError> {
                 .replace(":", "")
                 .replace(";", "")
                 .replace("’", "'");
-            let daily_story = Story {
+            Ok(Story {
                 title: latest_story.title,
                 sources: latest_story.sources,
                 story: filtered_story,
                 when: latest_story.when,
-            };
-            *last_story = Some((challenge_date, daily_story.clone()));
-            Ok(daily_story)
+            })
         }
-        None => Err(ServerFnError::new("No stories found")),
+        None => Err("No stories found".to_string()),
     }
 }
 
@@ -183,18 +211,11 @@ pub async fn get_leaderboard(
     let scope = LeaderboardScope::parse(&scope)
         .ok_or_else(|| ServerFnError::new("Leaderboard scope must be day, week, or global"))?;
     let today = Utc::now().date_naive();
-    let challenge_date = match day.as_deref() {
-        Some(value) => parse_challenge_date(value)
-            .ok_or_else(|| ServerFnError::new("Challenge day must use YYYY-MM-DD"))?,
-        None => today,
+    let challenge_date = if scope == LeaderboardScope::Global {
+        today
+    } else {
+        resolve_challenge_day(day.as_deref(), today)?
     };
-
-    if scope == LeaderboardScope::Day && !is_allowed_recent_day(challenge_date, today) {
-        return Err(ServerFnError::new(format!(
-            "Day leaderboards are limited to the latest {RECENT_LEADERBOARD_DAYS} UTC days"
-        )));
-    }
-
     let board_id = board_id_for_scope(scope, challenge_date);
     if let Some(cached) = cached_leaderboard(&board_id).await {
         return Ok(cached);
@@ -229,6 +250,8 @@ pub async fn save_typing_result(
         .ok_or_else(|| ServerFnError::new("Sign in to save typing history"))?;
 
     validate_run_id(&submission.run_id).map_err(ServerFnError::new)?;
+    let today = Utc::now().date_naive();
+    let challenge_date = resolve_challenge_day(Some(submission.challenge_date.as_str()), today)?;
     let metrics = calculate_typing_metrics(
         submission.correct_words,
         submission.wrong_words,
@@ -236,7 +259,7 @@ pub async fn save_typing_result(
     )
     .map_err(ServerFnError::new)?;
 
-    let story = get_story().await?;
+    let story = get_story(Some(challenge_date_string(challenge_date))).await?;
     if story.when.timestamp() != submission.story_when.timestamp() {
         return Err(ServerFnError::new(
             "The typing story changed before this result was saved",
@@ -258,7 +281,7 @@ pub async fn save_typing_result(
         created_at_epoch_seconds: created_at.timestamp(),
     };
 
-    let (saved, touched_boards) = save_result_transaction(&user_id, result)
+    let (saved, touched_boards) = save_result_transaction(&user_id, result, challenge_date)
         .await
         .map_err(private_server_error)?;
     invalidate_leaderboard_cache(&touched_boards).await;
@@ -355,6 +378,7 @@ async fn load_leaderboard_from_firestore(
 async fn save_result_transaction(
     user_id: &str,
     result: TypingResult,
+    challenge_date: NaiveDate,
 ) -> firestore::FirestoreResult<(TypingResult, Vec<String>)> {
     let db = get_client_db().await;
     let user_id = user_id.to_string();
@@ -415,7 +439,6 @@ async fn save_result_transaction(
                 .object(&user)
                 .add_to_transaction(transaction)?;
 
-            let challenge_date = result.story_when.date_naive();
             let challenge_date_str = challenge_date_string(challenge_date);
             let candidate = LeaderboardStoredEntry {
                 github_id: user.github_id.clone(),

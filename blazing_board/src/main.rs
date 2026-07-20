@@ -101,35 +101,66 @@ pub fn TypingWords() -> Element {
     let mut processed_gamification_run = use_signal(|| None::<String>);
     let mut new_badge = use_signal(|| None::<Badge>);
     let mut new_personal_best = use_signal(|| false);
-    let challenge_date = use_signal(current_challenge_date);
+    let today = use_signal(current_challenge_date);
+    let mut selected_challenge_day = use_signal(current_challenge_date);
 
     use_effect(move || {
         local_stats.set(load_local_stats());
         local_stats_loaded.set(true);
     });
 
-    let re_story = use_resource(|| async move {
-        get_story().await.unwrap_or(Story {
-            ..Default::default()
-        })
-    });
-    let profile_resource =
-        use_resource(|| async move { get_private_profile().await.unwrap_or(None) });
-    let mut leaderboard_scope = use_signal(|| LeaderboardScope::Day);
-    let mut leaderboard_day = use_signal(current_challenge_date);
     let recent_days_resource = use_resource(|| async move {
         get_recent_leaderboard_days()
             .await
             .unwrap_or_else(|_| vec![current_challenge_date()])
     });
+    let re_story = use_resource(move || {
+        let day = selected_challenge_day();
+        async move {
+            get_story(Some(day)).await.unwrap_or(Story {
+                ..Default::default()
+            })
+        }
+    });
+    let profile_resource =
+        use_resource(|| async move { get_private_profile().await.unwrap_or(None) });
+    let mut leaderboard_scope = use_signal(|| LeaderboardScope::Day);
     let leaderboard_resource = use_resource(move || {
         let scope = leaderboard_scope();
-        let day = leaderboard_day();
+        let day = selected_challenge_day();
         async move {
             get_leaderboard(scope.as_str().to_string(), Some(day))
                 .await
                 .ok()
         }
+    });
+
+    let mut reset_run = move || {
+        current_chunk_index.set(0);
+        current_word_in_chunk_index.set(0);
+        current_text.set(String::new());
+        user_words.set(Vec::new());
+        started_at.set(None);
+        run_id.set(String::new());
+        correct_words.set(0);
+        wrong_words.set(0);
+        duration_seconds.set(0);
+        timer_value.set(TEST_DURATION_SECONDS);
+        running.set(false);
+        finished.set(false);
+        submitted_run.set(None);
+        save_message.set(String::new());
+        combo.set(0);
+        max_combo.set(0);
+        combo_milestone.set(None);
+        processed_gamification_run.set(None);
+        new_badge.set(None);
+        new_personal_best.set(false);
+    };
+
+    use_effect(move || {
+        let _day = selected_challenge_day();
+        reset_run();
     });
 
     let story = re_story().unwrap_or(Story {
@@ -182,6 +213,7 @@ pub fn TypingWords() -> Element {
             save_message.set("Saving result…".to_string());
             let submission = TypingSubmission {
                 run_id: current_run_id,
+                challenge_date: selected_challenge_day(),
                 story_when: story.when,
                 correct_words: correct_words(),
                 wrong_words: wrong_words(),
@@ -223,7 +255,9 @@ pub fn TypingWords() -> Element {
             return;
         };
         let mut updated_stats = local_stats();
-        complete_daily_challenge(&mut updated_stats, &challenge_date());
+        if selected_challenge_day() == today() {
+            complete_daily_challenge(&mut updated_stats, &today());
+        }
         new_personal_best.set(update_personal_bests(
             &mut updated_stats,
             run_metrics.wpm,
@@ -264,8 +298,18 @@ pub fn TypingWords() -> Element {
     let wpm = metrics.map(|current| current.wpm).unwrap_or(0.0);
     let score = metrics.map(|current| current.score).unwrap_or(0);
     let stats = local_stats();
-    let completed_today = stats.last_completion_date.as_deref() == Some(challenge_date().as_str());
-    let elapsed_seconds = if running() || finished() {
+    let playing_today = selected_challenge_day() == today();
+    let completed_today = stats.last_completion_date.as_deref() == Some(today().as_str());
+    let recent_days = recent_days_resource().unwrap_or_else(|| vec![selected_challenge_day()]);
+    let challenge_status = if playing_today {
+        if completed_today {
+            "Complete for today"
+        } else {
+            "Ready to blaze"
+        }
+    } else {
+        "Past challenge"
+    };    let elapsed_seconds = if running() || finished() {
         (TEST_DURATION_SECONDS - timer_value()).clamp(0, TEST_DURATION_SECONDS)
     } else {
         0
@@ -298,19 +342,32 @@ pub fn TypingWords() -> Element {
             ProfileBar { profile: profile.clone() }
             section { class: "daily-status", aria_label: "Daily challenge status",
                 div {
-                    span { class: "daily-label", "Daily challenge" }
-                    strong {
-                        if completed_today {
-                            "Complete for today"
-                        } else {
-                            "Ready to blaze"
-                        }
-                    }
+                    span { class: "daily-label", "Challenge day" }
+                    strong { "{challenge_status}" }
                 }
                 div { class: "streak-count",
                     span { aria_hidden: "true", "🔥" }
                     strong { "{stats.streak}" }
                     span { " day streak" }
+                }
+            }
+            div { class: "challenge-day-picker",
+                label { r#for: "challenge-day", "Play challenge" }
+                select {
+                    id: "challenge-day",
+                    value: "{selected_challenge_day}",
+                    onchange: move |event| selected_challenge_day.set(event.value()),
+                    for day in recent_days.iter() {
+                        option {
+                            value: "{day}",
+                            selected: *day == selected_challenge_day(),
+                            if *day == today() {
+                                "{day} · today"
+                            } else {
+                                "{day}"
+                            }
+                        }
+                    }
                 }
             }
             if stats.best_score > 0 {
@@ -478,28 +535,7 @@ pub fn TypingWords() -> Element {
                     }
                     Button {
                         size: ButtonSize::Lg,
-                        onclick: move |_| {
-                            current_chunk_index.set(0);
-                            current_word_in_chunk_index.set(0);
-                            current_text.set(String::new());
-                            user_words.set(Vec::new());
-                            started_at.set(None);
-                            run_id.set(String::new());
-                            correct_words.set(0);
-                            wrong_words.set(0);
-                            duration_seconds.set(0);
-                            timer_value.set(TEST_DURATION_SECONDS);
-                            running.set(false);
-                            finished.set(false);
-                            submitted_run.set(None);
-                            save_message.set(String::new());
-                            combo.set(0);
-                            max_combo.set(0);
-                            combo_milestone.set(None);
-                            processed_gamification_run.set(None);
-                            new_badge.set(None);
-                            new_personal_best.set(false);
-                        },
+                        onclick: move |_| reset_run(),
                         "Try again"
                     }
                     if !save_message().is_empty() {
@@ -518,11 +554,7 @@ pub fn TypingWords() -> Element {
                 LeaderboardPanel {
                     board: leaderboard_resource().flatten(),
                     scope: leaderboard_scope(),
-                    selected_day: leaderboard_day(),
-                    recent_days: recent_days_resource()
-                        .unwrap_or_else(|| vec![leaderboard_day()]),
                     on_scope: move |scope| leaderboard_scope.set(scope),
-                    on_day: move |day| leaderboard_day.set(day),
                 }
 
                 div { class: "sources",
@@ -629,10 +661,7 @@ fn HistoryPanel(profile: PrivateProfile) -> Element {
 fn LeaderboardPanel(
     board: Option<Leaderboard>,
     scope: LeaderboardScope,
-    selected_day: String,
-    recent_days: Vec<String>,
     on_scope: EventHandler<LeaderboardScope>,
-    on_day: EventHandler<String>,
 ) -> Element {
     rsx! {
         section { class: "leaderboard-panel",
@@ -661,19 +690,6 @@ fn LeaderboardPanel(
                     aria_selected: scope == LeaderboardScope::Global,
                     onclick: move |_| on_scope.call(LeaderboardScope::Global),
                     "Global"
-                }
-            }
-            if scope == LeaderboardScope::Day {
-                div { class: "leaderboard-day-picker",
-                    label { r#for: "leaderboard-day", "Challenge day" }
-                    select {
-                        id: "leaderboard-day",
-                        value: "{selected_day}",
-                        onchange: move |event| on_day.call(event.value()),
-                        for day in recent_days.iter() {
-                            option { value: "{day}", selected: *day == selected_day, "{day}" }
-                        }
-                    }
                 }
             }
             if let Some(board) = board {
