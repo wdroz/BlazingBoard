@@ -1,5 +1,5 @@
 #[cfg(feature = "server")]
-use chrono::{Duration, NaiveDate, NaiveTime, Utc};
+use chrono::{NaiveDate, NaiveTime, Utc};
 use dioxus::prelude::*;
 use models::{Leaderboard, PrivateProfile, Story, TypingResult, TypingSubmission};
 #[cfg(feature = "server")]
@@ -122,16 +122,16 @@ fn resolve_challenge_day(
 #[cfg(feature = "server")]
 async fn load_story_for_day(challenge_date: NaiveDate) -> Result<Story, String> {
     let db = get_client_db().await;
-    // Story active on challenge_date: latest text published before the next UTC midnight.
-    let next_day = (challenge_date + Duration::days(1))
-        .and_time(NaiveTime::MIN)
-        .and_utc();
+    // Freeze each challenge at the start of its UTC day. Using the end of the
+    // selected day here can assign the same late-published story to both today
+    // and yesterday until the next story is generated.
+    let story_cutoff = story_cutoff_for_day(challenge_date);
 
     let mut story_stream = db
         .fluent()
         .select()
         .from("texts")
-        .filter(|q| q.field("when").less_than(FirestoreTimestamp(next_day)))
+        .filter(|q| q.field("when").less_than(FirestoreTimestamp(story_cutoff)))
         .order_by([("when", FirestoreQueryDirection::Descending)])
         .limit(1)
         .obj::<Story>()
@@ -158,6 +158,11 @@ async fn load_story_for_day(challenge_date: NaiveDate) -> Result<Story, String> 
         }
         None => Err("No stories found".to_string()),
     }
+}
+
+#[cfg(feature = "server")]
+fn story_cutoff_for_day(challenge_date: NaiveDate) -> chrono::DateTime<Utc> {
+    challenge_date.and_time(NaiveTime::MIN).and_utc()
 }
 
 #[get(
@@ -541,4 +546,31 @@ pub(crate) async fn get_client_db() -> &'static FirestoreDb {
             db
         })
         .await
+}
+
+#[cfg(all(test, feature = "server"))]
+mod tests {
+    use super::story_cutoff_for_day;
+    use chrono::{DateTime, NaiveDate, Utc};
+
+    #[test]
+    fn consecutive_challenges_have_distinct_story_cutoffs() {
+        let yesterday = NaiveDate::from_ymd_opt(2026, 7, 20).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 7, 21).unwrap();
+        let late_yesterday_story = DateTime::parse_from_rfc3339("2026-07-20T21:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert_eq!(
+            story_cutoff_for_day(yesterday).to_rfc3339(),
+            "2026-07-20T00:00:00+00:00"
+        );
+        assert_eq!(
+            story_cutoff_for_day(today).to_rfc3339(),
+            "2026-07-21T00:00:00+00:00"
+        );
+        assert!(story_cutoff_for_day(yesterday) < story_cutoff_for_day(today));
+        assert!(late_yesterday_story >= story_cutoff_for_day(yesterday));
+        assert!(late_yesterday_story < story_cutoff_for_day(today));
+    }
 }
