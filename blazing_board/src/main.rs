@@ -22,6 +22,7 @@ use jiff::Timestamp;
 use models::{
     Leaderboard, LeaderboardScope, PrivateProfile, Story, TypingSubmission, calculate_typing_metrics,
 };
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 const DEFAULT_TITLE: &str = "";
@@ -101,6 +102,7 @@ pub fn TypingWords() -> Element {
     let mut processed_gamification_run = use_signal(|| None::<String>);
     let mut new_badge = use_signal(|| None::<Badge>);
     let mut new_personal_best = use_signal(|| false);
+    let mut text_input_ref: Signal<Option<Rc<MountedData>>> = use_signal(|| None);
     let today = use_signal(current_challenge_date);
     let mut selected_challenge_day = use_signal(current_challenge_date);
 
@@ -356,7 +358,14 @@ pub fn TypingWords() -> Element {
                 select {
                     id: "challenge-day",
                     value: "{selected_challenge_day}",
-                    onchange: move |event| selected_challenge_day.set(event.value()),
+                    onchange: move |event| {
+                        selected_challenge_day.set(event.value());
+                        if let Some(input) = text_input_ref() {
+                            spawn(async move {
+                                let _ = input.set_focus(true).await;
+                            });
+                        }
+                    },
                     for day in recent_days.iter() {
                         option {
                             value: "{day}",
@@ -431,6 +440,13 @@ pub fn TypingWords() -> Element {
             if current_chunk_index() < nb_chunks_to_write && !finished() {
                 input {
                     id: "textUser",
+                    onmounted: move |event| {
+                        let input = event.data();
+                        text_input_ref.set(Some(input.clone()));
+                        spawn(async move {
+                            let _ = input.set_focus(true).await;
+                        });
+                    },
                     oninput: move |event| {
                         let current_chunk_clone = current_chunk.clone();
                         async move {
@@ -494,7 +510,6 @@ pub fn TypingWords() -> Element {
                         }
                     },
                     value: "{current_text}",
-                    autofocus: true,
                     autocomplete: "off",
                     autocapitalize: "off",
                     spellcheck: "false",
